@@ -81,6 +81,15 @@ class NetWatchApp {
         </div>
 
         <div class="nw-header-controls">
+          <!-- NIC Selector (Visible when > 1 interface exists) -->
+          <div id="nic-selector-container" style="display: none; align-items: center; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px; background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 8px; font-size: 11px;">
+              <span style="color: var(--brand); font-weight: 700;">🔌 NIC:</span>
+              <select id="nic-select" class="nw-select" style="padding: 2px 6px; font-size: 11px; font-weight: 600; border: none; background: transparent; cursor: pointer; color: var(--text-primary);" title="Select Network Card to monitor">
+              </select>
+            </div>
+          </div>
+
           <!-- Live / Demo Switcher -->
           <button id="toggle-mode-btn" class="nw-btn" title="Toggle Live Host vs Scenario Replay [D]">
             🔄 Switch to Demo Scenario [D]
@@ -164,6 +173,14 @@ class NetWatchApp {
     `;
 
     // Bind header controls
+    const nicSelect = document.querySelector('#nic-select');
+    if (nicSelect) {
+      nicSelect.addEventListener('change', async (e) => {
+        const newNic = e.target.value;
+        await telemetry.setSelectedInterface(newNic);
+      });
+    }
+
     document.querySelector('#theme-select').addEventListener('change', (e) => {
       this.applyTheme(e.target.value);
     });
@@ -323,6 +340,34 @@ class NetWatchApp {
   }
 
   updateHeaderAndStatus(data) {
+    // Multi-NIC selector in header
+    const ifaces = data.interfaces || [];
+    const nicContainer = document.querySelector('#nic-selector-container');
+    const nicSelect = document.querySelector('#nic-select');
+    if (nicContainer && nicSelect) {
+      if (ifaces.length > 1) {
+        nicContainer.style.display = 'flex';
+        const ifaceKeys = ifaces.map(i => `${i.name}:${i.ipv4}`).join('|');
+        if (nicSelect.dataset.keys !== ifaceKeys) {
+          nicSelect.dataset.keys = ifaceKeys;
+          const currentVal = nicSelect.value;
+          nicSelect.innerHTML = ifaces.map(i => {
+            const typeIcon = i.type === 'Wi-Fi' ? '📶' : (i.type === 'Loopback' ? '🔄' : '🔌');
+            const shortIp = i.ipv4 ? i.ipv4.split('/')[0] : 'No IP';
+            return `<option value="${i.name}">${typeIcon} ${i.name} (${shortIp})</option>`;
+          }).join('');
+          if (currentVal && ifaces.some(i => i.name === currentVal)) {
+            nicSelect.value = currentVal;
+          }
+        }
+        if (data.selectedInterface && nicSelect.value !== data.selectedInterface) {
+          nicSelect.value = data.selectedInterface;
+        }
+      } else {
+        nicContainer.style.display = 'none';
+      }
+    }
+
     // Mode pill
     const modePill = document.querySelector('#mode-pill');
     const modeLabel = document.querySelector('#mode-label');

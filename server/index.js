@@ -19,11 +19,20 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Process crash guards for server resilience
+process.on('uncaughtException', (err) => {
+  console.error('[Process] Uncaught exception guarded:', err.message);
+});
+process.on('unhandledRejection', (reason) => {
+  console.warn('[Process] Unhandled rejection guarded:', reason);
+});
+
 const httpServer = createServer(app);
 const wss = new WebSocketServer({ server: httpServer });
 
 // State
-let currentMode = 'live'; // 'live' | 'demo'
+let currentMode = 'live';
+let selectedInterface = null; // 'live' | 'demo'
 let isPaused = false;
 
 const scenarioDriver = new ScenarioDriver();
@@ -36,6 +45,11 @@ const clients = new Set();
 wss.on('connection', (ws) => {
   clients.add(ws);
   console.log(`[WS] Client connected. Total: ${clients.size}`);
+
+  // Prevent unhandled socket errors from crashing process on disconnect
+  ws.on('error', (err) => {
+    console.warn('[WS] Client socket notice:', err.message);
+  });
 
   // Send immediate initial frame
   try {
@@ -61,6 +75,11 @@ wss.on('connection', (ws) => {
 });
 
 function handleClientMessage(data, ws) {
+  if (data.type === 'SET_SELECTED_INTERFACE') {
+    selectedInterface = data.iface;
+    broadcastTelemetry();
+    return;
+  }
   if (data.type === 'SET_MODE') {
     currentMode = data.mode;
     broadcastTelemetry();
@@ -123,8 +142,20 @@ async function collectLiveSnapshot() {
     }
     const processesList = Array.from(procMap.values()).sort((a, b) => (b.rxRate + b.txRate) - (a.rxRate + a.txRate));
 
+    const nonInternal = ifaces.filter(i => i.type !== 'Loopback' && i.status === 'UP');
+    const defaultIface = nonInternal.length > 0 ? nonInternal[0].name : (ifaces[0]?.name || '');
+    const activeIfaceName = selectedInterface && ifaces.some(i => i.name === selectedInterface)
+      ? selectedInterface
+      : defaultIface;
+
+    const enrichedIfaces = ifaces.map(i => ({
+      ...i,
+      selected: i.name === activeIfaceName
+    }));
+
     lastSystemSnapshot = {
       mode: 'live',
+      selectedInterface: activeIfaceName,
       time: timeStr,
       banner: 'LIVE HOST: Direct OS Network Telemetry (Windows)',
       kpis: {
@@ -195,7 +226,7 @@ async function collectLiveSnapshot() {
         history: liveThroughputHistory
       },
       connections: conns,
-      interfaces: ifaces,
+      interfaces: enrichedIfaces,
       packets: scenarioDriver.simulatedPackets.slice(-30),
       stats: {
         protocols: [
@@ -259,7 +290,21 @@ setInterval(async () => {
 
 function getLatestTelemetry() {
   if (currentMode === 'demo') {
-    return scenarioDriver.tick();
+    const frame = scenarioDriver.tick();
+    if (frame && frame.interfaces) {
+      const ifaces = frame.interfaces;
+      const nonInternal = ifaces.filter(i => i.type !== 'Loopback' && i.status === 'UP');
+      const defaultIface = nonInternal.length > 0 ? nonInternal[0].name : (ifaces[0]?.name || '');
+      const activeIfaceName = selectedInterface && ifaces.some(i => i.name === selectedInterface)
+        ? selectedInterface
+        : defaultIface;
+      frame.selectedInterface = activeIfaceName;
+      frame.interfaces = ifaces.map(i => ({
+        ...i,
+        selected: i.name === activeIfaceName
+      }));
+    }
+    return frame;
   }
   return lastSystemSnapshot || {
     mode: 'live',
@@ -294,7 +339,11 @@ function broadcastTelemetry() {
 
   for (const client of clients) {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
+      try {
+        client.send(payload);
+      } catch (err) {
+        console.warn('[WS] Broadcast send notice:', err.message);
+      }
     }
   }
 }
@@ -309,6 +358,13 @@ app.get('/api/status', (req, res) => {
     uptimeSec: process.uptime(),
     clientsCount: clients.size
   });
+});
+
+app.post('/api/interfaces/select', (req, res) => {
+  const { iface } = req.body;
+  selectedInterface = iface;
+  broadcastTelemetry();
+  res.json({ success: true, selectedInterface });
 });
 
 app.post('/api/mode', (req, res) => {
@@ -456,6 +512,8 @@ app.get('/api/doctor', async (req, res) => {
       },
       {
         id: 'interface_discovery',
+        interfaces: ifaceNames,
+        selectedInterface: selectedInterface || ifaceNames[0] || '',
         name: 'Network Interface Discovery',
         state: ifaceNames.length > 0 ? 'ready' : 'degraded',
         detail: `${ifaceNames.length} network adapters discovered (${ifaceNames.join(', ')}).`,

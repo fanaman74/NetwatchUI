@@ -287,6 +287,19 @@ export class DoctorScreen {
       `;
     }
 
+    if (cap.id === 'interface_discovery' && cap.interfaces && cap.interfaces.length > 1) {
+      const selectedNic = localStorage.getItem('nw_selected_nic') || cap.selectedInterface || cap.interfaces[0];
+      cap.extraHtml = `
+        <div style="margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; background: rgba(0,0,0,0.25); padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-subtle);">
+          <span style="font-size: 11px; font-weight: 700; color: var(--brand);">Choose Primary Network Card:</span>
+          ${cap.interfaces.map(name => `
+            <button class="nw-btn doctor-nic-btn ${name === selectedNic ? 'active' : ''}" data-nic="${name}" style="padding: 2px 8px; font-size: 10px; ${name === selectedNic ? 'background: var(--brand); color: #000; border-color: var(--brand);' : ''}">
+              ${name} ${name === selectedNic ? '✓' : ''}
+            </button>
+          `).join('')}
+        </div>
+      `;
+    }
     row.innerHTML = `
       <span class="nw-doctor-status ${isReady ? 'pass' : (isOptional ? 'warn' : 'fail')}">
         ${isReady ? '✓' : (isOptional ? 'ℹ' : '✖')}

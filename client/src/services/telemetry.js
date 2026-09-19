@@ -27,6 +27,10 @@ class TelemetryService {
       this.ws.onopen = () => {
         this.connected = true;
         console.log('📡 Connected to NetWatch telemetry stream');
+        const savedNic = localStorage.getItem('nw_selected_nic');
+        if (savedNic && this.ws.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({ type: 'SET_SELECTED_INTERFACE', iface: savedNic }));
+        }
       };
 
       this.ws.onmessage = (event) => {
@@ -130,6 +134,23 @@ class TelemetryService {
       body: JSON.stringify({ state })
     });
     return res.json();
+  }
+
+  async setSelectedInterface(iface) {
+    localStorage.setItem('nw_selected_nic', iface);
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'SET_SELECTED_INTERFACE', iface }));
+    }
+    try {
+      const res = await fetch('/api/interfaces/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ iface })
+      });
+      return res.json();
+    } catch {
+      // ignore
+    }
   }
 
   downloadPcap() {
