@@ -30,6 +30,7 @@ class NetWatchApp {
     this.initDOM();
     this.initTabComponents();
     this.bindKeyboardShortcuts();
+    this.initTouchGestures();
     this.connectTelemetry();
 
     // Run Pre-Flight System Check on startup unless skipped
@@ -259,7 +260,11 @@ class NetWatchApp {
     main.innerHTML = '';
 
     document.querySelectorAll('.nw-tab').forEach(tab => {
-      tab.classList.toggle('active', parseInt(tab.getAttribute('data-tab'), 10) === tabId);
+      const isCurrent = parseInt(tab.getAttribute('data-tab'), 10) === tabId;
+      tab.classList.toggle('active', isCurrent);
+      if (isCurrent) {
+        tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
     });
 
     switch (tabId) {
@@ -284,6 +289,45 @@ class NetWatchApp {
     this.switchTab(1);
   }
 
+  initTouchGestures() {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartTime = 0;
+
+    window.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchStartTime = Date.now();
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', (e) => {
+      if (e.changedTouches.length === 1 && this.currentView === 'full') {
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+        const elapsed = Date.now() - touchStartTime;
+
+        // Don't trigger swipe if touch originated in form elements, canvas, tables, or modals
+        const target = e.target;
+        if (target && target.closest('input, select, textarea, canvas, .nw-table-container, .nw-modal, .nw-doctor-card')) {
+          return;
+        }
+
+        // Clean horizontal flick (> 55px horizontal, < 45px vertical, < 350ms duration)
+        if (Math.abs(deltaX) > 55 && Math.abs(deltaY) < 45 && elapsed < 350) {
+          if (deltaX < 0 && this.activeTabId < 10) {
+            this.switchTab(this.activeTabId + 1);
+          } else if (deltaX > 0 && this.activeTabId > 1) {
+            this.switchTab(this.activeTabId - 1);
+          }
+        }
+      }
+    }, { passive: true });
+  }
+
   bindKeyboardShortcuts() {
     window.addEventListener('keydown', (e) => {
       // Don't intercept if typing inside input
@@ -295,6 +339,8 @@ class NetWatchApp {
       }
 
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+
+      // macOS Command & Windows Ctrl search shortcut: ⌘K or ⌘/
       if (isCmdOrCtrl && (e.key === 'k' || e.key === 'K' || e.key === '/')) {
         e.preventDefault();
         const searchInput = document.querySelector('input[type="text"]');
@@ -302,6 +348,33 @@ class NetWatchApp {
           searchInput.focus();
           searchInput.select?.();
         }
+        return;
+      }
+
+      // macOS ⌘1-9 & Ctrl+1-9 tab switching
+      if (isCmdOrCtrl && e.key >= '1' && e.key <= '9') {
+        e.preventDefault();
+        this.switchTab(parseInt(e.key, 10));
+        return;
+      }
+      if (isCmdOrCtrl && e.key === '0') {
+        e.preventDefault();
+        this.switchTab(10);
+        return;
+      }
+
+      // macOS ⌘D / Ctrl+D toggle live/demo mode
+      if (isCmdOrCtrl && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        const toggleBtn = document.querySelector('#toggle-mode-btn');
+        if (toggleBtn) toggleBtn.click();
+        return;
+      }
+
+      // macOS ⌘E / Ctrl+E export pcap
+      if (isCmdOrCtrl && (e.key === 'e' || e.key === 'E')) {
+        e.preventDefault();
+        telemetry.downloadPcap();
         return;
       }
 

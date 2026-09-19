@@ -919,7 +919,14 @@ canvas.nw-mirrored-canvas {
    macOS & iOS WebKit / Mobile Safari Optimizations
    ============================================================ */
 
-/* 1. iOS Safe Area Insets (iPhone notch / dynamic island / home indicator) */
+/* 1. Global Touch, Smooth Momentum & Overscroll Containment */
+html, body {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: contain;
+}
+
 body {
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -930,28 +937,50 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-.nw-footer {
-  padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+#app {
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
-/* 2. Touch & Momentum Scrolling for iOS */
-.nw-tabs {
+.nw-header {
+  padding-top: max(10px, env(safe-area-inset-top, 10px));
+  padding-left: max(18px, env(safe-area-inset-left, 18px));
+  padding-right: max(18px, env(safe-area-inset-right, 18px));
+}
+
+.nw-tabs-bar {
+  padding-left: max(12px, env(safe-area-inset-left, 12px));
+  padding-right: max(12px, env(safe-area-inset-right, 12px));
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  flex-wrap: nowrap;
+  overscroll-behavior-x: contain;
 }
-.nw-tabs::-webkit-scrollbar {
+.nw-tabs-bar::-webkit-scrollbar {
   display: none;
+}
+
+.nw-footer {
+  padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  padding-left: max(18px, env(safe-area-inset-left, 18px));
+  padding-right: max(18px, env(safe-area-inset-right, 18px));
 }
 
 .nw-table-container {
   -webkit-overflow-scrolling: touch;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 
-.nw-doctor-card {
+.nw-doctor-card,
+.nw-modal {
   -webkit-overflow-scrolling: touch;
+  max-height: calc(100dvh - 32px) !important;
+}
+
+/* 2. Mobile Swipe & Touch Hint Pill */
+.mobile-swipe-hint {
+  display: none;
 }
 
 /* 3. Responsive Breakpoints for iPad / iPhone / Mobile Safari */
@@ -960,6 +989,7 @@ body {
     flex-wrap: wrap;
     gap: 8px;
     padding: 10px 14px;
+    padding-top: max(10px, env(safe-area-inset-top, 10px));
   }
   
   .nw-header-controls {
@@ -981,7 +1011,6 @@ body {
     width: 96vw !important;
     max-width: 96vw !important;
     padding: 16px !important;
-    max-height: 92vh !important;
   }
 
   .nw-doctor-header {
@@ -1014,17 +1043,36 @@ body {
   }
 
   .nw-btn {
-    min-height: 36px; /* Touch-friendly tap target size on iOS */
-    padding: 4px 10px;
+    min-height: 40px; /* Touch-friendly tap target size on iOS (HIG standard) */
+    padding: 6px 12px;
   }
 
   .nw-tab {
-    padding: 6px 12px;
-    font-size: 12px;
+    padding: 8px 14px;
+    font-size: 13px;
+    min-height: 42px;
   }
 
   .nw-footer-hints {
     display: none; /* Hide keyboard hints on mobile devices without physical keyboard */
+  }
+
+  .mobile-swipe-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--brand);
+    background: rgba(0, 210, 255, 0.08);
+    border: 1px dashed var(--brand);
+    border-radius: var(--radius-sm);
+    padding: 4px 8px;
+    margin-bottom: 8px;
+  }
+
+  /* Stacking modal grid on phones */
+  .nw-modal-body[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
   }
 }
 

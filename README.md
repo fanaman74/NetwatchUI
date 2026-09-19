@@ -39,6 +39,21 @@ A fullstack web application conversion of the [NetWatch Rust network monitor](ht
 - **Lite View (`L`)**: Clean minimalist executive overview.
 - **8 Themes**: Cyberpunk Midnight (Default), Tokyo Night, Gruvbox Dark, Solarized Dark, Nord Aurora, Monokai Pro, Synthwave 84, and High-Contrast Matrix.
 
+### 5. Native macOS & Apple iOS Support
+- **🍎 macOS Desktop & WebKit**:
+  - Full Command (`⌘`) keybindings: `⌘1`–`⌘0` (tabs), `⌘K` / `⌘/` (search), `⌘D` (live/demo), `Space` / `⌘P` (pause), `⌘E` (pcap export).
+  - Trackpad swipe containment (`overscroll-behavior-x: contain`) to prevent accidental Safari history navigation.
+  - Native hardware port detection via `networksetup -listallhardwareports` (Wi-Fi, Ethernet, Thunderbolt).
+  - Native macOS socket telemetry via `lsof` and `netstat -an -p tcp`.
+  - Built-in `/usr/lib/libpcap.dylib` kernel BPF driver support with Homebrew recommendations.
+- **📱 Apple iOS & iPadOS (Mobile Safari)**:
+  - **PWA Ready**: Add to Home Screen via Safari for standalone, fullscreen experience with custom high-res Apple Touch icons (`manifest.json`).
+  - **Notch & Dynamic Island Awareness**: Integrated CSS `env(safe-area-inset-top)` and `env(safe-area-inset-bottom)`.
+  - **Dynamic Viewport Height (`100dvh`)**: Eliminates iOS Safari address bar jumps and toolbar clipping.
+  - **Touch Gestures**: Horizontal swipe navigation across all 10 tabs with auto-centering tab bar.
+  - **Retina HiDPI Canvas**: Crystal-clear mirrored graph rendering at native device pixel ratio (`2x`/`3x`).
+  - **Apple HIG Touch Targets**: Touch target heights &ge; 40-44px for effortless thumb tapping.
+
 ---
 
 ## 🚀 Quick Start (Local Development)
