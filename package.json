@@ -1,0 +1,33 @@
+{
+  "name": "netwatch-web",
+  "version": "0.30.0",
+  "description": "NetWatch - Web-based Network Monitor & Diagnostic Engine",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "build": "npm --prefix client install && npm --prefix client run build && npm --prefix server install",
+    "dev": "node start.js",
+    "server": "cd server && npm start",
+    "client": "cd client && npm run dev"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "network-monitor",
+    "netwatch",
+    "telemetry",
+    "pcap",
+    "diagnostics",
+    "egress-linter",
+    "websockets"
+  ],
+  "author": "NetWatch Community",
+  "license": "MIT"
+}

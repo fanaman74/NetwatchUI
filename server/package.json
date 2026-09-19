@@ -1,0 +1,15 @@
+{
+  "name": "netwatch-server",
+  "version": "0.30.0",
+  "description": "NetWatch Web Backend - Live Network Collector & Scenario Engine",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}

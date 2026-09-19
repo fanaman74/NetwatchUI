@@ -1,0 +1,32 @@
+# NetWatch Web Application .gitignore
+
+# Upstream Rust source clone (reference only, not part of web application)
+netwatch-source/
+
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Production frontend build output (compiled dynamically during Railway build)
+client/dist/
+dist/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# OS & Editor generated files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.tmp
