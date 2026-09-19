@@ -17,17 +17,30 @@ export class DoctorScreen {
     }
     this.renderInitial();
 
-    // 1. Client-side Environment Checks
+    // 1. Client-side Environment Checks (macOS, iOS, Windows, Linux detection)
+    const ua = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isMac = !isIOS && /Macintosh|MacIntel|MacPPC|Mac68K/.test(ua);
     const hasWs = typeof WebSocket !== 'undefined';
     const canvasTest = document.createElement('canvas');
     const hasCanvas = !!(canvasTest.getContext && canvasTest.getContext('2d'));
+    const dpr = window.devicePixelRatio || 1;
     const screenRes = `${window.innerWidth}x${window.innerHeight}`;
 
-    await this.wait(300);
+    await this.wait(200);
     this.updateCheckItem('client-ws', hasWs ? 'pass' : 'fail', hasWs ? 'WebSocket API Supported' : 'WebSockets Unavailable in this browser');
 
-    await this.wait(250);
-    this.updateCheckItem('client-canvas', hasCanvas ? 'pass' : 'fail', hasCanvas ? `HTML5 Canvas 2D Accelerated (${screenRes})` : 'Canvas Unsupported');
+    await this.wait(200);
+    this.updateCheckItem('client-canvas', hasCanvas ? 'pass' : 'fail', hasCanvas ? `HTML5 Canvas 2D Accelerated (Retina ${dpr}x · ${screenRes})` : 'Canvas Unsupported');
+
+    await this.wait(200);
+    const platformLabel = isIOS ? 'Apple iOS (iPhone / iPad Mobile WebKit)' : (isMac ? 'Apple macOS (Desktop WebKit)' : `${navigator.platform || 'Desktop Browser'}`);
+    const platformDetail = isIOS
+      ? `Mobile touch gestures enabled · Safe area margins active · Retina HiDPI @ ${dpr}x.`
+      : (isMac
+        ? `Apple macOS environment · ⌘ Command shortcut mappings active · Retina display @ ${dpr}x.`
+        : `Desktop client · Screen resolution ${screenRes} @ ${dpr}x.`);
+    this.updateCheckItem('client-platform', 'pass', `${platformLabel} · ${platformDetail}`);
 
     // 2. Query Server Doctor API
     try {
@@ -39,12 +52,73 @@ export class DoctorScreen {
       // Update system info banner
       const sysBanner = this.container.querySelector('#doctor-system-info');
       if (sysBanner) {
+        const clientTag = isIOS ? '📱 Apple iOS (iPhone/iPad)' : (isMac ? '🍎 Apple macOS' : '💻 ' + (navigator.platform || 'Desktop'));
         sysBanner.innerHTML = `
-          <span>Platform: <strong>${data.platform.os} (${data.platform.arch})</strong></span> ·
+          <span>Host: <strong>${data.platform.os} (${data.platform.arch})</strong></span> ·
+          <span>Client: <strong>${clientTag}</strong></span> ·
           <span>Node: <strong>${data.platform.nodeVersion}</strong></span> ·
-          <span>Host: <strong>${data.platform.hostname}</strong></span> ·
           <span>Memory: <strong>${data.platform.freeMemGb} GB free / ${data.platform.totalMemGb} GB</strong></span>
         `;
+      }
+
+      
+      // 2b. Evaluate Host NICs as part of Initial Pre-Flight Checks
+      const nicCap = data.capabilities.find(c => c.id === 'nic_discovery' || c.id === 'interface_discovery');
+      const nics = (nicCap && nicCap.nics) || [];
+      const hasNics = nics.length > 0;
+      const selectedNic = localStorage.getItem('nw_selected_nic') || (nicCap ? nicCap.selectedNic : (nics[0]?.name || ''));
+
+      if (hasNics) {
+        const activeNic = nics.find(n => n.name === selectedNic) || nics[0];
+        const statusText = nics.length === 1
+          ? `1 Network Card detected: ${activeNic.name} (${activeNic.description || activeNic.type}) · IP: ${activeNic.ipv4} · Speed: ${activeNic.linkSpeed}`
+          : `${nics.length} Network Cards detected · Active: ${activeNic.name} (${activeNic.ipv4}) · Speed: ${activeNic.linkSpeed}`;
+
+        this.updateCheckItem('initial-nics', 'pass', statusText);
+
+        const picker = this.container.querySelector('#initial-nics-picker');
+        if (picker && nics.length > 1) {
+          picker.style.display = 'flex';
+          picker.style.flexWrap = 'wrap';
+          picker.style.gap = '6px';
+          picker.style.alignItems = 'center';
+          picker.innerHTML = `
+            <span style="font-size: 11px; font-weight: 700; color: var(--brand); margin-right: 4px;">Select Active NIC:</span>
+            ${nics.map(n => {
+              const isSel = n.name === selectedNic;
+              return `<button class="nw-btn doctor-quick-nic-btn ${isSel ? 'active' : ''}" data-nic="${n.name}" style="padding: 3px 8px; font-size: 10px; ${isSel ? 'background: var(--brand); color: #000; font-weight: 700; border-color: var(--brand);' : ''}">
+                ${n.icon || '🔌'} ${n.name} (${n.ipv4}) ${isSel ? '✓' : ''}
+              </button>`;
+            }).join('')}
+          `;
+
+          picker.querySelectorAll('.doctor-quick-nic-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              e.preventDefault();
+              const chosen = btn.dataset.nic;
+              localStorage.setItem('nw_selected_nic', chosen);
+              fetch('/api/interfaces/select', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: chosen })
+              }).catch(() => {});
+
+              picker.querySelectorAll('.doctor-quick-nic-btn').forEach(b => {
+                const isIt = b.dataset.nic === chosen;
+                b.className = `nw-btn doctor-quick-nic-btn ${isIt ? 'active' : ''}`;
+                b.style.background = isIt ? 'var(--brand)' : '';
+                b.style.color = isIt ? '#000' : '';
+                b.style.fontWeight = isIt ? '700' : 'normal';
+                b.style.borderColor = isIt ? 'var(--brand)' : '';
+                b.innerHTML = b.innerHTML.replace(' ✓', '') + (isIt ? ' ✓' : '');
+              });
+              const activeUpdated = nics.find(n => n.name === chosen) || activeNic;
+              this.updateCheckItem('initial-nics', 'pass', `${nics.length} Network Cards detected · Active: ${activeUpdated.name} (${activeUpdated.ipv4}) · Speed: ${activeUpdated.linkSpeed}`);
+            });
+          });
+        }
+      } else {
+        this.updateCheckItem('initial-nics', 'warn', 'No physical network interface detected.');
       }
 
       // Populate capabilities checklist with install options
@@ -141,6 +215,23 @@ export class DoctorScreen {
             <div style="flex: 1;">
               <strong>Client HTML5 Canvas 2D Hardware Acceleration</strong>
               <div class="detail" style="font-size: 11px; color: var(--text-muted);">Verifying 2D context for Mirrored Throughput rendering...</div>
+            </div>
+          </div>
+
+                    <div class="nw-doctor-item" id="item-initial-nics">
+            <span class="nw-doctor-status checking">●</span>
+            <div style="flex: 1;">
+              <strong>Network Interface Cards (NICs) & Physical Adapters</strong>
+              <div class="detail" style="font-size: 11px; color: var(--text-muted);">Detecting host network adapters, physical NICs, and IP addresses...</div>
+              <div id="initial-nics-picker" style="display: none; margin-top: 8px;"></div>
+            </div>
+          </div>
+
+<div class="nw-doctor-item" id="item-client-platform">
+            <span class="nw-doctor-status checking">●</span>
+            <div style="flex: 1;">
+              <strong>Client Platform &amp; Device Compatibility</strong>
+              <div class="detail" style="font-size: 11px; color: var(--text-muted);">Detecting macOS / iOS WebKit engine, Retina HiDPI, and touch capabilities...</div>
             </div>
           </div>
         </div>

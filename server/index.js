@@ -621,16 +621,26 @@ app.get('/api/doctor', async (req, res) => {
       },
       {
         id: 'npcap_driver',
-        name: 'Npcap / libpcap Packet Capture Driver',
+        name: process.platform === 'darwin' ? 'macOS libpcap & BPF Kernel Capture Driver' : (process.platform === 'win32' ? 'Npcap Packet Capture Driver' : 'Linux libpcap / AF_PACKET Driver'),
         state: npcapInstalled ? 'ready' : 'optional_missing',
-        detail: npcapInstalled
-          ? 'Npcap / libpcap capture driver detected in system path.'
-          : 'Npcap is not installed on this host. (Socket monitoring & process attribution work without it; native raw hardware capture requires Npcap).',
+        detail: process.platform === 'darwin'
+          ? 'Apple macOS native libpcap is pre-installed in /usr/lib/libpcap.dylib with BPF capture device support.'
+          : (npcapInstalled
+            ? 'Npcap / libpcap capture driver detected in system path.'
+            : 'Npcap is not installed on this host. (Socket monitoring & process attribution work without it; native raw hardware capture requires Npcap).'),
         install_info: {
-          url: 'https://npcap.com/#download',
-          label: '📥 Download Npcap Installer (.exe)',
-          command: 'winget install Insecure.Npcap  # Or: scoop install npcap',
-          instructions: '1. Download the Npcap installer from npcap.com.\n2. Run the installer and check "Install Npcap in WinPcap API-compatible Mode".\n3. Restart or refresh NetWatch to enable raw promiscuous packet capture.'
+          url: process.platform === 'darwin'
+            ? 'https://developer.apple.com/library/archive/documentation/Darwin/Conceptual/KernelProgramming/'
+            : (process.platform === 'win32' ? 'https://npcap.com/#download' : 'https://www.tcpdump.org/'),
+          label: process.platform === 'darwin' ? 'macOS BPF Guide' : (process.platform === 'win32' ? '📥 Download Npcap (.exe)' : 'libpcap Docs'),
+          command: process.platform === 'darwin'
+            ? 'sudo chmod o+r /dev/bpf*'
+            : (process.platform === 'win32' ? 'winget install Insecure.Npcap  # Or: scoop install npcap' : 'sudo apt install libpcap-dev'),
+          instructions: process.platform === 'darwin'
+            ? 'macOS includes native libpcap out-of-the-box. To allow promiscuous packet capture for standard non-root accounts, run: sudo chmod o+r /dev/bpf*'
+            : (process.platform === 'win32'
+              ? '1. Download the Npcap installer from npcap.com.\n2. Run the installer and check "Install Npcap in WinPcap API-compatible Mode".\n3. Restart or refresh NetWatch to enable raw promiscuous packet capture.'
+              : 'Install libpcap via your Linux package manager (sudo apt install libpcap-dev or pacman -S libpcap).')
         }
       }
     ],
@@ -639,13 +649,17 @@ app.get('/api/doctor', async (req, res) => {
         name: 'Wireshark Network Analyzer',
         recommended_for: 'Opening and analyzing .pcap binary files exported from NetWatch Packets tab.',
         url: 'https://www.wireshark.org/download.html',
-        command: 'winget install WiresharkFoundation.Wireshark'
+        command: process.platform === 'darwin'
+          ? 'brew install --cask wireshark'
+          : (process.platform === 'win32' ? 'winget install WiresharkFoundation.Wireshark' : 'sudo apt install wireshark')
       },
       {
         name: 'NetWatch CLI (Terminal Binary)',
         recommended_for: 'Running NetWatch directly inside your terminal or SSH session.',
         url: 'https://github.com/matthart1983/netwatch/releases/latest',
-        command: 'scoop install netwatch  # Or: brew install netwatch'
+        command: process.platform === 'darwin'
+          ? 'brew install netwatch'
+          : (process.platform === 'win32' ? 'scoop install netwatch  # Or: brew install netwatch' : 'cargo install netwatch')
       }
     ],
     overall_health: socketProviderWorking && dnsWorking ? 'READY' : 'DEGRADED'

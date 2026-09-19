@@ -914,3 +914,117 @@ canvas.nw-mirrored-canvas {
   background: linear-gradient(90deg, var(--rx-rate), var(--tx-rate));
   border-radius: 2px;
 }
+
+/* ============================================================
+   macOS & iOS WebKit / Mobile Safari Optimizations
+   ============================================================ */
+
+/* 1. iOS Safe Area Insets (iPhone notch / dynamic island / home indicator) */
+body {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.nw-footer {
+  padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+}
+
+/* 2. Touch & Momentum Scrolling for iOS */
+.nw-tabs {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex-wrap: nowrap;
+}
+.nw-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.nw-table-container {
+  -webkit-overflow-scrolling: touch;
+  overflow-x: auto;
+}
+
+.nw-doctor-card {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 3. Responsive Breakpoints for iPad / iPhone / Mobile Safari */
+@media (max-width: 900px) {
+  .nw-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+  
+  .nw-header-controls {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .nw-main {
+    padding: 12px 10px;
+    gap: 12px;
+  }
+
+  /* Stack mid-deck cards on tablets and phones */
+  div[style*="grid-template-columns: 360px 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .nw-doctor-card {
+    width: 96vw !important;
+    max-width: 96vw !important;
+    padding: 16px !important;
+    max-height: 92vh !important;
+  }
+
+  .nw-doctor-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  #companion-tools-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .nw-logo {
+    font-size: 16px;
+  }
+
+  .nw-banner-pill {
+    display: none; /* Hide pill on narrow mobile phones */
+  }
+
+  .nw-kpi-strip {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .nw-kpi-value {
+    font-size: 20px;
+  }
+
+  .nw-btn {
+    min-height: 36px; /* Touch-friendly tap target size on iOS */
+    padding: 4px 10px;
+  }
+
+  .nw-tab {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .nw-footer-hints {
+    display: none; /* Hide keyboard hints on mobile devices without physical keyboard */
+  }
+}
+

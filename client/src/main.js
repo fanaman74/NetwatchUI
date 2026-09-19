@@ -157,13 +157,17 @@ class NetWatchApp {
       <!-- Footer -->
       <footer class="nw-footer">
         <div class="nw-footer-hints">
-          <span>[1-0] Tabs</span>
-          <span>[V] Cycle View</span>
-          <span>[T] Theme</span>
-          <span>[D] Live/Demo</span>
-          <span>[P] Pause</span>
-          <span>[/] Filter</span>
-          <span>[?] Help</span>
+          ${(() => {
+            const ua = navigator.userAgent;
+            const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const isMac = !isIOS && /Macintosh|MacIntel|MacPPC|Mac68K/.test(ua);
+            if (isIOS) {
+              return `<span>📱 Touch / Swipe Navigation</span> <span>[Live / Demo]</span> <span>[Theme]</span> <span>[?] Help</span>`;
+            } else if (isMac) {
+              return `<span>[⌘1-0] Tabs</span> <span>[V] View</span> <span>[T] Theme</span> <span>[D] Live/Demo</span> <span>[Space] Pause</span> <span>[⌘/] Filter</span> <span>[?] Help</span>`;
+            }
+            return `<span>[1-0] Tabs</span> <span>[V] Cycle View</span> <span>[T] Theme</span> <span>[D] Live/Demo</span> <span>[P] Pause</span> <span>[/] Filter</span> <span>[?] Help</span>`;
+          })()}
         </div>
         <div id="footer-status" style="display: flex; gap: 14px; align-items: center;">
           <span id="ws-status" style="color: var(--status-good);">● Connected</span>
