@@ -848,3 +848,69 @@ canvas.nw-mirrored-canvas {
   flex-direction: column;
   gap: 6px;
 }
+
+/* Top 15 Connections Styles */
+.nw-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.nw-rank-badge.rank-1 {
+  background: rgba(255, 215, 0, 0.16);
+  color: #ffd700;
+  border-color: rgba(255, 215, 0, 0.45);
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.25);
+}
+
+.nw-rank-badge.rank-2 {
+  background: rgba(200, 205, 215, 0.16);
+  color: #d1d5db;
+  border-color: rgba(200, 205, 215, 0.45);
+}
+
+.nw-rank-badge.rank-3 {
+  background: rgba(205, 127, 50, 0.16);
+  color: #cd7f32;
+  border-color: rgba(205, 127, 50, 0.45);
+}
+
+.nw-table tr.clickable-row {
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.nw-table tr.clickable-row:hover {
+  background-color: var(--bg-hover) !important;
+}
+
+.nw-table tr.selected {
+  background-color: rgba(0, 210, 255, 0.12) !important;
+}
+
+.nw-mini-bar-container {
+  width: 60px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+.nw-mini-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--rx-rate), var(--tx-rate));
+  border-radius: 2px;
+}
