@@ -471,6 +471,17 @@ app.get('/api/doctor', async (req, res) => {
     dnsWorking = false;
   }
 
+  // Check NICs (Network Interface Cards) hardware & status
+  let nics = [];
+  try {
+    nics = await systemCollector.getNicsDetail();
+  } catch (err) {
+    console.warn('[Doctor] Error querying NIC details:', err.message);
+  }
+  const activeNics = nics.filter(n => n.isUp && !n.isInternal);
+  const physicalNics = nics.filter(n => n.isPhysical);
+  const primaryNic = activeNics.find(n => n.name === selectedInterface) || activeNics[0] || physicalNics[0] || nics[0] || null;
+
   const report = {
     schema_version: 1,
     scope: 'static_and_runtime',
@@ -511,17 +522,25 @@ app.get('/api/doctor', async (req, res) => {
         }
       },
       {
-        id: 'interface_discovery',
+        id: 'nic_discovery',
+        name: 'Network Interface Cards (NICs) & Physical Adapters',
+        state: activeNics.length > 0 ? 'ready' : (physicalNics.length > 0 ? 'degraded' : 'unavailable'),
+        detail: activeNics.length > 0
+          ? `${nics.length} NICs discovered (${activeNics.length} online). Primary: ${primaryNic?.name} (${primaryNic?.description || primaryNic?.type}) · ${primaryNic?.ipv4} @ ${primaryNic?.linkSpeed}.`
+          : (physicalNics.length > 0
+            ? `${physicalNics.length} physical NIC(s) detected, but no adapter is currently connected with an active IP address.`
+            : 'No physical or virtual network interface cards detected on this host.'),
+        nics: nics,
+        selectedNic: selectedInterface || (primaryNic ? primaryNic.name : ''),
         interfaces: ifaceNames,
-        selectedInterface: selectedInterface || ifaceNames[0] || '',
-        name: 'Network Interface Discovery',
-        state: ifaceNames.length > 0 ? 'ready' : 'degraded',
-        detail: `${ifaceNames.length} network adapters discovered (${ifaceNames.join(', ')}).`,
+        selectedInterface: selectedInterface || (primaryNic ? primaryNic.name : ifaceNames[0] || ''),
         install_info: {
           url: 'https://learn.microsoft.com/en-us/windows-server/networking/',
-          label: 'Windows Network Adapters Guide',
-          command: 'Get-NetAdapter',
-          instructions: 'Ensure at least one physical or virtual network interface is enabled in your OS.'
+          label: 'Network Adapter Guide & Docs',
+          command: process.platform === 'win32' ? 'Get-NetAdapter | Format-Table Name, InterfaceDescription, Status, LinkSpeed' : 'ip link show',
+          instructions: process.platform === 'win32'
+            ? '1. Open Network Connections via Win+R -> "ncpa.cpl".\n2. Verify your Ethernet or Wi-Fi network interface card is enabled and plugged in.\n3. Run "Get-NetAdapter" in PowerShell as Administrator.'
+            : 'Ensure at least one physical Ethernet (eth0) or Wi-Fi (wlan0) NIC is enabled in your Linux network manager (ip link set <nic> up).'
         }
       },
       {

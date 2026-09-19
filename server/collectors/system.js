@@ -60,6 +60,127 @@ export class SystemCollector {
     return result;
   }
 
+  async getNicsDetail() {
+    const netIfs = os.networkInterfaces();
+    const nics = [];
+    const hardwareMap = new Map();
+
+    if (process.platform === 'win32') {
+      try {
+        const { stdout } = await execAsync('powershell -Command "Get-NetAdapter | Select-Object Name, InterfaceDescription, Status, LinkSpeed, MacAddress | ConvertTo-Json"');
+        const parsed = JSON.parse(stdout);
+        const list = Array.isArray(parsed) ? parsed : [parsed];
+        for (const item of list) {
+          if (item && item.Name) {
+            hardwareMap.set(item.Name.toLowerCase(), {
+              name: item.Name,
+              description: item.InterfaceDescription || '',
+              status: item.Status || 'Unknown',
+              linkSpeed: item.LinkSpeed || '',
+              mac: (item.MacAddress || '').replace(/-/g, ':')
+            });
+          }
+        }
+      } catch {
+        // PowerShell query fallback
+      }
+    } else if (process.platform === 'linux') {
+      try {
+        const { stdout } = await execAsync('ip -j link show 2>/dev/null');
+        const list = JSON.parse(stdout);
+        for (const item of list) {
+          if (item && item.ifname) {
+            hardwareMap.set(item.ifname.toLowerCase(), {
+              name: item.ifname,
+              description: item.link_type || 'Network Interface',
+              status: item.operstate === 'UP' ? 'Up' : (item.operstate || 'Down'),
+              linkSpeed: item.mtu ? `MTU ${item.mtu}` : '',
+              mac: item.address || ''
+            });
+          }
+        }
+      } catch {
+        // fallback
+      }
+    }
+
+    for (const [name, addrs] of Object.entries(netIfs)) {
+      let ipv4 = '-';
+      let ipv6 = '-';
+      let mac = '-';
+      let isInternal = false;
+
+      for (const a of addrs) {
+        if (a.family === 'IPv4') ipv4 = a.cidr || `${a.address}/${a.netmask}`;
+        if (a.family === 'IPv6') ipv6 = a.address;
+        if (a.mac && a.mac !== '00:00:00:00:00:00') mac = a.mac;
+        if (a.internal) isInternal = true;
+      }
+
+      const lowerName = name.toLowerCase();
+      const hw = hardwareMap.get(lowerName);
+
+      let nicType = 'Ethernet';
+      let icon = '🔌';
+      if (isInternal || lowerName.includes('loopback')) {
+        nicType = 'Loopback';
+        icon = '🔄';
+      } else if (lowerName.includes('wi-fi') || lowerName.includes('wlan') || lowerName.includes('wireless')) {
+        nicType = 'Wi-Fi';
+        icon = '📶';
+      } else if (lowerName.includes('bluetooth')) {
+        nicType = 'Bluetooth';
+        icon = '🔷';
+      } else if (lowerName.includes('veth') || lowerName.includes('docker') || lowerName.includes('br-')) {
+        nicType = 'Virtual / Bridge';
+        icon = '🐳';
+      }
+
+      const finalStatus = hw ? hw.status : (isInternal ? 'Up' : (ipv4 !== '-' ? 'Up' : 'Disconnected'));
+      const finalMac = (hw && hw.mac) ? hw.mac : mac;
+      const finalSpeed = (hw && hw.linkSpeed) ? hw.linkSpeed : (isInternal ? '10 Gbps' : (nicType === 'Ethernet' ? '1 Gbps' : '866 Mbps'));
+      const finalDesc = (hw && hw.description) ? hw.description : (isInternal ? 'Software Loopback Pseudo-Interface' : `${nicType} Network Controller`);
+
+      nics.push({
+        name,
+        description: finalDesc,
+        type: nicType,
+        icon,
+        status: finalStatus,
+        isUp: finalStatus.toLowerCase() === 'up',
+        linkSpeed: finalSpeed,
+        mac: finalMac,
+        ipv4,
+        ipv6,
+        isInternal,
+        isPhysical: !isInternal && !lowerName.includes('loopback') && !lowerName.includes('pseudo')
+      });
+    }
+
+    // Include hardware adapters that may have no IP currently assigned
+    for (const [key, hw] of hardwareMap.entries()) {
+      const exists = nics.some(n => n.name.toLowerCase() === key);
+      if (!exists) {
+        nics.push({
+          name: hw.name || key,
+          description: hw.description || 'Hardware Network Adapter',
+          type: key.includes('bluetooth') ? 'Bluetooth' : (key.includes('wi-fi') ? 'Wi-Fi' : 'Ethernet'),
+          icon: key.includes('bluetooth') ? '🔷' : (key.includes('wi-fi') ? '📶' : '🔌'),
+          status: hw.status || 'Disconnected',
+          isUp: (hw.status || '').toLowerCase() === 'up',
+          linkSpeed: hw.linkSpeed || 'Unknown',
+          mac: hw.mac || '-',
+          ipv4: '-',
+          ipv6: '-',
+          isInternal: false,
+          isPhysical: true
+        });
+      }
+    }
+
+    return nics;
+  }
+
   async getConnections() {
     // Only refresh connections every 2 seconds to avoid overloading PowerShell
     const now = Date.now();

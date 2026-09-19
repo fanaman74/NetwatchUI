@@ -287,19 +287,55 @@ export class DoctorScreen {
       `;
     }
 
-    if (cap.id === 'interface_discovery' && cap.interfaces && cap.interfaces.length > 1) {
-      const selectedNic = localStorage.getItem('nw_selected_nic') || cap.selectedInterface || cap.interfaces[0];
-      cap.extraHtml = `
-        <div style="margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; background: rgba(0,0,0,0.25); padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-subtle);">
-          <span style="font-size: 11px; font-weight: 700; color: var(--brand);">Choose Primary Network Card:</span>
-          ${cap.interfaces.map(name => `
-            <button class="nw-btn doctor-nic-btn ${name === selectedNic ? 'active' : ''}" data-nic="${name}" style="padding: 2px 8px; font-size: 10px; ${name === selectedNic ? 'background: var(--brand); color: #000; border-color: var(--brand);' : ''}">
-              ${name} ${name === selectedNic ? '✓' : ''}
-            </button>
-          `).join('')}
+    let nicsHtml = '';
+    if (cap.nics && cap.nics.length > 0) {
+      const selectedNic = localStorage.getItem('nw_selected_nic') || cap.selectedNic || cap.nics[0].name;
+      nicsHtml = `
+        <div class="doctor-nics-deck" style="margin-top: 10px; display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+            <strong style="font-size: 11px; color: var(--brand); letter-spacing: 0.5px;">
+              DETECTED NETWORK ADAPTERS &amp; HARDWARE NICS (${cap.nics.length})
+            </strong>
+            <span style="font-size: 10px; color: var(--text-muted);">Select active interface to monitor</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px;">
+            ${cap.nics.map(nic => {
+              const isSelected = nic.name === selectedNic;
+              const isOnline = nic.isUp;
+              return `
+                <div class="doctor-nic-card ${isSelected ? 'selected' : ''}" style="background: rgba(255,255,255,0.03); border: 1px solid ${isSelected ? 'var(--brand)' : 'var(--border-subtle)'}; border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; gap: 4px;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="font-size: 15px;">${nic.icon}</span>
+                      <div>
+                        <strong style="font-size: 12px; color: var(--text-primary);">${nic.name}</strong>
+                        <div style="font-size: 10px; color: var(--text-muted);">${nic.description}</div>
+                      </div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+                      <span class="nw-chip ${isOnline ? 'established' : 'time_wait'}" style="font-size: 9px; padding: 1px 6px;">${nic.status.toUpperCase()}</span>
+                      <span class="nw-key-badge" style="font-size: 9px;">${nic.linkSpeed}</span>
+                    </div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary); margin-top: 4px; border-top: 1px solid var(--border-subtle); padding-top: 4px;">
+                    <div>
+                      <span style="color: var(--text-muted);">IP:</span> <span style="color: ${nic.ipv4 !== '-' ? 'var(--brand)' : 'var(--text-muted)'};">${nic.ipv4}</span>
+                    </div>
+                    <div>
+                      <span style="color: var(--text-muted);">MAC:</span> <span>${nic.mac}</span>
+                    </div>
+                  </div>
+                  <button class="nw-btn doctor-select-nic-btn ${isSelected ? 'active' : ''}" data-nic-name="${nic.name}" style="margin-top: 4px; width: 100%; padding: 3px 6px; font-size: 10px; font-weight: 600; text-align: center; ${isSelected ? 'background: var(--brand); color: #000; border-color: var(--brand);' : ''}">
+                    ${isSelected ? '✓ Monitored Active NIC' : 'Select for Live Monitoring'}
+                  </button>
+                </div>
+              `;
+            }).join('')}
+          </div>
         </div>
       `;
     }
+
     row.innerHTML = `
       <span class="nw-doctor-status ${isReady ? 'pass' : (isOptional ? 'warn' : 'fail')}">
         ${isReady ? '✓' : (isOptional ? 'ℹ' : '✖')}
@@ -319,9 +355,38 @@ export class DoctorScreen {
         <div class="detail" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
           ${cap.detail}
         </div>
+        ${nicsHtml}
         ${installBoxHtml}
       </div>
     `;
+
+    // Bind NIC selection events
+    row.querySelectorAll('.doctor-select-nic-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const nicName = btn.getAttribute('data-nic-name');
+        localStorage.setItem('nw_selected_nic', nicName);
+        try {
+          await fetch('/api/interfaces/select', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ iface: nicName })
+          });
+        } catch {
+          // ignore
+        }
+        row.querySelectorAll('.doctor-nic-card').forEach(c => c.style.borderColor = 'var(--border-subtle)');
+        btn.closest('.doctor-nic-card')?.style.setProperty('border-color', 'var(--brand)');
+        row.querySelectorAll('.doctor-select-nic-btn').forEach(b => {
+          const isThis = b.getAttribute('data-nic-name') === nicName;
+          b.className = `nw-btn doctor-select-nic-btn ${isThis ? 'active' : ''}`;
+          b.style.background = isThis ? 'var(--brand)' : '';
+          b.style.color = isThis ? '#000' : '';
+          b.style.borderColor = isThis ? 'var(--brand)' : '';
+          b.textContent = isThis ? '✓ Monitored Active NIC' : 'Select for Live Monitoring';
+        });
+      });
+    });
 
     list.appendChild(row);
   }
