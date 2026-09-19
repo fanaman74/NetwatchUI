@@ -294,6 +294,17 @@ class NetWatchApp {
         return;
       }
 
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (isCmdOrCtrl && (e.key === 'k' || e.key === 'K' || e.key === '/')) {
+        e.preventDefault();
+        const searchInput = document.querySelector('input[type="text"]');
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select?.();
+        }
+        return;
+      }
+
       if (e.key === '?') {
         showHelpModal();
       } else if (e.key === 'v' || e.key === 'V') {
