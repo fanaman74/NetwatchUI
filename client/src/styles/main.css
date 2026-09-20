@@ -6,13 +6,22 @@
   padding: 0;
 }
 
+html {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
 body {
   background-color: var(--bg-app);
   color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.4;
-  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
   transition: background-color var(--transition-normal), color var(--transition-normal);
   -webkit-font-smoothing: antialiased;
 }
@@ -38,7 +47,10 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  max-width: 100vw;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  position: relative;
 }
 
 /* ==========================================================================
@@ -57,15 +69,18 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  gap: 12px;
+  gap: 10px;
   box-sizing: border-box;
   white-space: nowrap;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .nw-header-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
   min-width: 0;
 }
@@ -217,9 +232,18 @@ body {
 .nw-header-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+  gap: 6px;
+  flex-shrink: 1;
+  min-width: 0;
   justify-content: flex-end;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.nw-header-right::-webkit-scrollbar,
+.nw-header-controls::-webkit-scrollbar {
+  display: none;
 }
 
 /* Unified Buttons in Header */
@@ -468,6 +492,11 @@ select option:checked {
   padding: 0 12px;
   overflow-x: auto;
   scrollbar-width: none;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 .nw-tabs-bar::-webkit-scrollbar {
   display: none;
@@ -487,6 +516,7 @@ select option:checked {
   gap: 8px;
   white-space: nowrap;
   transition: all var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .nw-tab:hover {
@@ -525,6 +555,11 @@ select option:checked {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 /* KPI Hero Strip */
@@ -649,6 +684,10 @@ select option:checked {
   padding: 14px 18px;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .nw-panel-header {
@@ -1271,65 +1310,66 @@ body {
 
 /* 3. Comprehensive Responsive Breakpoints */
 
-@media (max-width: 1300px) {
+@media (max-width: 1350px) {
   .nw-kbd {
     display: none !important;
   }
-  .nw-header-right,
-  .nw-header-controls {
-    gap: 6px;
-  }
-  #nic-select {
-    max-width: 145px !important;
-  }
-}
-
-@media (max-width: 1100px) {
-  .nw-mode-btn .nw-btn-text,
   .nw-doctor-btn .nw-btn-text,
   .nw-pause-btn .nw-btn-text {
     display: none !important;
   }
-  .nw-header-btn,
-  .nw-btn {
-    padding: 0 8px;
+  .nw-header-right,
+  .nw-header-controls {
+    gap: 5px;
   }
   #nic-select {
-    max-width: 130px !important;
-  }
-  .nw-kpi-strip {
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    max-width: 140px !important;
   }
 }
 
-@media (max-width: 850px) {
-  .nw-header {
-    padding: 0 10px;
-    padding-top: env(safe-area-inset-top, 0px);
-    gap: 8px;
+@media (max-width: 1180px) {
+  .nw-mode-btn .nw-btn-text,
+  .nw-unifi-btn .nw-btn-text {
+    display: none !important;
+  }
+  .nw-header-btn,
+  .nw-btn {
+    padding: 0 7px;
+  }
+  #nic-select {
+    max-width: 120px !important;
+  }
+  .nw-theme-wrapper .nw-theme-icon {
+    display: none;
+  }
+  .nw-segmented-control .nw-segment-btn {
+    padding: 0 8px;
+    font-size: 11px;
+  }
+  .nw-kpi-strip {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+}
+
+@media (max-width: 950px) {
+  .nw-version-tag {
+    display: none !important;
   }
   .nw-header-separator {
-    display: none;
+    display: none !important;
   }
   .nw-nic-prefix {
-    display: none;
+    display: none !important;
   }
-  .nw-status-pill {
-    padding: 0 8px;
-    font-size: 10px;
+  #mode-label {
+    display: none !important;
   }
-  .nw-header-right,
-  .nw-header-controls {
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-    padding: 2px 0;
+  #mode-pill {
+    padding: 0 6px !important;
   }
-  .nw-header-right::-webkit-scrollbar,
-  .nw-header-controls::-webkit-scrollbar {
-    display: none;
+  .nw-segmented-control #view-btn-lite {
+    display: none !important;
   }
-
   .nw-main {
     padding: 12px 10px;
     gap: 12px;
@@ -1362,34 +1402,59 @@ body {
   }
 }
 
+@media (max-width: 768px) {
+  .nw-header {
+    padding: 0 8px;
+    padding-top: env(safe-area-inset-top, 0px);
+    gap: 6px;
+  }
+  .nw-header-left {
+    gap: 6px;
+  }
+  .nw-logo-text {
+    font-size: 13px;
+  }
+  #nic-selector-container {
+    padding: 0 4px;
+    max-width: 105px;
+  }
+  #nic-select {
+    max-width: 75px !important;
+    font-size: 10px !important;
+  }
+  .nw-tab {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  .nw-kpi-strip {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+}
+
 @media (max-width: 600px) {
   .nw-logo {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .nw-banner-pill {
     display: none; /* Hide pill on narrow mobile phones */
   }
 
-  .nw-kpi-strip {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-
   .nw-kpi-value {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .nw-btn {
-    min-height: 38px;
-    padding: 6px 10px;
+    min-height: 36px;
+    padding: 6px 8px;
     font-size: 11px;
   }
 
   .nw-tab {
-    padding: 8px 12px;
-    font-size: 12px;
-    min-height: 40px;
+    padding: 8px 10px;
+    font-size: 11.5px;
+    min-height: 38px;
     flex-shrink: 0;
   }
 

@@ -101,16 +101,13 @@ export class UnifiService {
   sanitizeControllerUrl(raw) {
     if (!raw) return '';
     let url = String(raw).trim();
-    // Strip surrounding quotes or backticks (e.g. "https://..." or 'https://...')
-    url = url.replace(/^["'`]+|["'`]+$/g, '').trim();
-    // Strip redundant leading schemes if user pasted multiple (e.g. https://"https://)
-    url = url.replace(/^(?:https?:[\s\/\\"'`]*)+/i, 'https://');
+    // Remove all quotes (single, double, backticks) anywhere
+    url = url.replace(/["'`]/g, '').trim();
 
-    if (/^http:\s*\/+/i.test(url)) {
-      url = url.replace(/^http:\s*\/+/i, 'http://');
-    } else if (/^https:\s*\/+/i.test(url)) {
-      url = url.replace(/^https:\s*\/+/i, 'https://');
-    } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    // If user pasted duplicate schemes like https://"https://
+    url = url.replace(/^(?:https?:\/*)+/i, (m) => m.toLowerCase().startsWith('http://') && !m.toLowerCase().includes('https') ? 'http://' : 'https://');
+
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
 
@@ -124,51 +121,81 @@ export class UnifiService {
     return url;
   }
 
+  _getCandidateUrls(rawUrl) {
+    const primary = this.sanitizeControllerUrl(rawUrl);
+    const candidates = [primary];
+    try {
+      const u = new URL(primary);
+      // If port 8443 specified, add fallback without 8443 (port 443 default on UDM/UniFi OS)
+      if (u.port === '8443') {
+        const alt = new URL(primary);
+        alt.port = '';
+        candidates.push(alt.origin);
+      }
+      // If no port (default 443), add fallback with 8443 (legacy standalone controller)
+      if (!u.port) {
+        const alt = new URL(primary);
+        alt.port = '8443';
+        candidates.push(alt.origin);
+      }
+      // If hostname is unifi.local or unifi, add 192.168.1.1 fallback
+      if (u.hostname === 'unifi.local' || u.hostname === 'unifi') {
+        candidates.push(`${u.protocol}//192.168.1.1${u.port ? ':' + u.port : ''}`);
+        candidates.push(`${u.protocol}//192.168.1.1`);
+      }
+    } catch {
+      // ignore
+    }
+    return [...new Set(candidates.filter(Boolean))];
+  }
+
   async testConnection(targetConfig) {
     const cfg = { ...this.config, ...targetConfig };
     if (!cfg.controllerUrl) {
       return { success: false, error: 'Controller URL is required (e.g. https://192.168.1.1)' };
     }
 
-    cfg.controllerUrl = this.sanitizeControllerUrl(cfg.controllerUrl);
+    const candidateUrls = this._getCandidateUrls(cfg.controllerUrl);
+    const originalUrl = this.sanitizeControllerUrl(cfg.controllerUrl);
 
-    try {
-      const url = new URL(cfg.controllerUrl);
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-        return { success: false, error: 'Invalid protocol. URL must start with http:// or https://' };
+    if (cfg.authType === 'apiKey') {
+      if (!cfg.apiKey) {
+        return { success: false, error: 'UniFi API Key is required' };
       }
+      // Test API Key against Integration API and classic endpoints
+      const endpoints = [
+        `/proxy/network/integration/v1/sites`,
+        `/proxy/network/v2/api/site/${cfg.site}/device`,
+        `/proxy/network/api/s/${cfg.site}/stat/sysinfo`,
+        `/proxy/network/api/s/${cfg.site}/stat/health`,
+        `/proxy/network/api/s/${cfg.site}/self`,
+        `/proxy/network/status`,
+        `/api/system/info`,
+        `/api/s/${cfg.site}/stat/sysinfo`
+      ];
 
-      if (cfg.authType === 'apiKey') {
-        if (!cfg.apiKey) {
-          return { success: false, error: 'UniFi API Key is required' };
-        }
-        // Test API Key against both Integration API (UniFi OS 3.x/4.x Network 8+) and classic endpoints
-        const endpoints = [
-          `/proxy/network/integration/v1/sites`,
-          `/proxy/network/v2/api/site/${cfg.site}/device`,
-          `/proxy/network/api/s/${cfg.site}/stat/sysinfo`,
-          `/proxy/network/api/s/${cfg.site}/stat/health`,
-          `/api/s/${cfg.site}/stat/sysinfo`
-        ];
-
-        let lastErr = null;
+      let lastErr = null;
+      for (const candidateUrl of candidateUrls) {
         for (const ep of endpoints) {
           try {
-            const res = await this._rawRequest(cfg.controllerUrl, ep, {
+            const res = await this._rawRequest(candidateUrl, ep, {
               method: 'GET',
               headers: {
                 'X-API-KEY': cfg.apiKey,
                 'Accept': 'application/json'
               },
               strictSsl: cfg.strictSsl,
-              timeout: 6000
+              timeout: 5000
             });
 
             if (res.status === 200) {
               return {
                 success: true,
-                message: 'Successfully connected and authenticated via UniFi API Key!',
+                message: candidateUrl !== originalUrl
+                  ? `Connected and authenticated via UniFi API Key! (Automatically routed to ${candidateUrl})`
+                  : 'Successfully connected and authenticated via UniFi API Key!',
                 detectedEndpoint: ep,
+                resolvedUrl: candidateUrl,
                 meta: res.data?.meta || {}
               };
             } else if (res.status === 401 || res.status === 403) {
@@ -180,32 +207,34 @@ export class UnifiService {
             lastErr = err;
           }
         }
+      }
 
-        return {
-          success: false,
-          error: lastErr ? `API Key connection failed: ${lastErr.message}` : 'Could not reach UniFi API endpoints on this host.'
-        };
-      } else {
-        // Username and password login test
-        if (!cfg.username || !cfg.password) {
-          return { success: false, error: 'Username and password are required' };
-        }
+      return {
+        success: false,
+        error: lastErr ? `API Key connection failed: ${lastErr.message}` : 'Could not reach UniFi API endpoints on this host.'
+      };
+    } else {
+      // Username and password login test
+      if (!cfg.username || !cfg.password) {
+        return { success: false, error: 'Username and password are required' };
+      }
 
-        // Try UniFi OS auth login followed by classic login
-        const loginEndpoints = [
-          { path: '/api/auth/login', body: { username: cfg.username, password: cfg.password, token: '' } },
-          { path: '/api/login', body: { username: cfg.username, password: cfg.password } }
-        ];
+      // Try UniFi OS auth login followed by classic login
+      const loginEndpoints = [
+        { path: '/api/auth/login', body: { username: cfg.username, password: cfg.password, token: '' } },
+        { path: '/api/login', body: { username: cfg.username, password: cfg.password } }
+      ];
 
-        let lastErr = null;
+      let lastErr = null;
+      for (const candidateUrl of candidateUrls) {
         for (const target of loginEndpoints) {
           try {
-            const res = await this._rawRequest(cfg.controllerUrl, target.path, {
+            const res = await this._rawRequest(candidateUrl, target.path, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(target.body),
               strictSsl: cfg.strictSsl,
-              timeout: 6000
+              timeout: 5000
             });
 
             if (res.status === 200) {
@@ -216,7 +245,10 @@ export class UnifiService {
               }
               return {
                 success: true,
-                message: 'Successfully authenticated with UniFi controller credentials!',
+                message: candidateUrl !== originalUrl
+                  ? `Authenticated with UniFi credentials! (Automatically routed to ${candidateUrl})`
+                  : 'Successfully authenticated with UniFi controller credentials!',
+                resolvedUrl: candidateUrl,
                 sessionCaptured: !!this.sessionCookie
               };
             } else if (res.status === 401 || res.status === 403) {
@@ -226,14 +258,12 @@ export class UnifiService {
             lastErr = err;
           }
         }
-
-        return {
-          success: false,
-          error: lastErr ? `Authentication failed: ${lastErr.message}` : 'Failed to authenticate with UniFi controller.'
-        };
       }
-    } catch (err) {
-      return { success: false, error: `Invalid Controller URL: ${err.message}` };
+
+      return {
+        success: false,
+        error: lastErr ? `Authentication failed: ${lastErr.message}` : 'Failed to authenticate with UniFi controller.'
+      };
     }
   }
 
@@ -243,6 +273,10 @@ export class UnifiService {
     const test = await this.testConnection(newConfig);
     if (!test.success) {
       return test;
+    }
+
+    if (test.resolvedUrl) {
+      newConfig.controllerUrl = test.resolvedUrl;
     }
 
     this.config = { ...this.config, ...newConfig };

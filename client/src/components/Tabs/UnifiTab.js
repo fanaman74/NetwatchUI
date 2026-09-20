@@ -167,9 +167,10 @@ export class UnifiTab {
               <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px; color: var(--text-primary);">
                 Controller URL or IP Address
               </label>
-              <input type="text" id="cfg-unifi-url" class="nw-select" style="width: 100%; box-sizing: border-box; padding: 7px 10px;" placeholder="e.g. https://192.168.1.1 or https://unifi.local:8443" />
-              <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
-                Enter local IP (e.g. <code>https://192.168.1.1</code> for UDM/Gateway, or port <code>:8443</code> for standalone controllers).
+              <input type="text" id="cfg-unifi-url" class="nw-select" style="width: 100%; box-sizing: border-box; padding: 7px 10px;" placeholder="e.g. https://192.168.1.1" />
+              <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
+                💡 For <strong>UniFi Dream Machine (UDM/UDR/Cloud Gateway)</strong>, use: <code id="quick-fill-udm" style="color: var(--brand); cursor: pointer; text-decoration: underline;">https://192.168.1.1</code> (standard HTTPS, no port needed).<br>
+                For standalone software controllers, specify port <code>:8443</code>.
               </div>
             </div>
 
@@ -361,6 +362,15 @@ export class UnifiTab {
       });
     }
 
+    // Quick fill UDM default URL
+    const quickFillUdm = this.container.querySelector('#quick-fill-udm');
+    if (quickFillUdm) {
+      quickFillUdm.addEventListener('click', () => {
+        const urlInput = this.container.querySelector('#cfg-unifi-url');
+        if (urlInput) urlInput.value = 'https://192.168.1.1';
+      });
+    }
+
     // Test Connection Button
     const testBtn = this.container.querySelector('#cfg-unifi-test-btn');
     if (testBtn) {
@@ -381,14 +391,13 @@ export class UnifiTab {
   sanitizeControllerUrl(raw) {
     if (!raw) return '';
     let url = String(raw).trim();
-    url = url.replace(/^["'`]+|["'`]+$/g, '').trim();
-    url = url.replace(/^(?:https?:[\s\/\\"'`]*)+/i, 'https://');
+    // Remove all quotes anywhere
+    url = url.replace(/["'`]/g, '').trim();
 
-    if (/^http:\s*\/+/i.test(url)) {
-      url = url.replace(/^http:\s*\/+/i, 'http://');
-    } else if (/^https:\s*\/+/i.test(url)) {
-      url = url.replace(/^https:\s*\/+/i, 'https://');
-    } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    // Remove duplicate schemes if pasted like https://"https://
+    url = url.replace(/^(?:https?:\/*)+/i, (m) => m.toLowerCase().startsWith('http://') && !m.toLowerCase().includes('https') ? 'http://' : 'https://');
+
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
 
@@ -435,6 +444,9 @@ export class UnifiTab {
 
       resultBox.style.display = 'block';
       if (data.success) {
+        if (data.resolvedUrl) {
+          this.container.querySelector('#cfg-unifi-url').value = data.resolvedUrl;
+        }
         resultBox.style.background = 'rgba(63, 185, 80, 0.15)';
         resultBox.style.border = '1px solid var(--status-good)';
         resultBox.style.color = 'var(--status-good)';
@@ -450,7 +462,10 @@ export class UnifiTab {
       resultBox.style.background = 'rgba(248, 81, 73, 0.15)';
       resultBox.style.border = '1px solid var(--status-error)';
       resultBox.style.color = 'var(--status-error)';
-      resultBox.innerHTML = `❌ <strong>Error</strong>: ${err.message}`;
+      const msg = err.message === 'Failed to fetch'
+        ? 'Failed to connect to NetWatch backend. Please verify that the NetWatch server is running.'
+        : err.message;
+      resultBox.innerHTML = `❌ <strong>Error</strong>: ${msg}`;
     } finally {
       testBtn.innerHTML = '<span>🔌 Test Connection</span>';
       testBtn.disabled = false;
@@ -490,6 +505,9 @@ export class UnifiTab {
       const data = await res.json();
 
       if (data.success) {
+        if (data.resolvedUrl) {
+          this.container.querySelector('#cfg-unifi-url').value = data.resolvedUrl;
+        }
         this.closeConfigModal();
         await this.loadData();
       } else {
@@ -504,7 +522,10 @@ export class UnifiTab {
       resultBox.style.background = 'rgba(248, 81, 73, 0.15)';
       resultBox.style.border = '1px solid var(--status-error)';
       resultBox.style.color = 'var(--status-error)';
-      resultBox.innerHTML = `❌ <strong>Network Error</strong>: ${err.message}`;
+      const msg = err.message === 'Failed to fetch'
+        ? 'Failed to connect to NetWatch backend. Please verify that the NetWatch server is running.'
+        : err.message;
+      resultBox.innerHTML = `❌ <strong>Network Error</strong>: ${msg}`;
     } finally {
       saveBtn.innerHTML = 'Save & Connect';
       saveBtn.disabled = false;
