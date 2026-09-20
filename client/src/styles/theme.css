@@ -1,6 +1,8 @@
 /* NetWatch 8 Official Themes & Design Tokens */
 
 :root {
+  color-scheme: dark;
+
   /* Common typography */
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -227,6 +229,7 @@
 
 /* 7. PAPER THEME (Clean High-Contrast Light) */
 [data-theme="paper"] {
+  color-scheme: light;
   --bg-app: #f6f8fa;
   --bg-panel: rgba(255, 255, 255, 0.9);
   --bg-panel-solid: #ffffff;

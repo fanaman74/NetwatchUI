@@ -90,7 +90,7 @@ class NetWatchApp {
           <div id="nic-selector-container" style="display: none; align-items: center; gap: 6px;">
             <div style="display: flex; align-items: center; gap: 6px; background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 8px; font-size: 11px;">
               <span style="color: var(--brand); font-weight: 700;">🔌 NIC:</span>
-              <select id="nic-select" class="nw-select" style="padding: 2px 6px; font-size: 11px; font-weight: 600; border: none; background: transparent; cursor: pointer; color: var(--text-primary);" title="Select Network Card to monitor">
+              <select id="nic-select" class="nw-select" style="padding: 2px 6px; font-size: 11px; font-weight: 600; border: none; background: var(--bg-panel-solid); cursor: pointer; color: var(--text-primary); color-scheme: dark;" title="Select Network Card to monitor">
               </select>
             </div>
           </div>
@@ -466,7 +466,7 @@ class NetWatchApp {
         if (nicSelect.dataset.keys !== optKeys) {
           nicSelect.dataset.keys = optKeys;
           const currentVal = nicSelect.value;
-          nicSelect.innerHTML = allOptions.map(o => `<option value="${o.id}">${o.label}</option>`).join('');
+          nicSelect.innerHTML = allOptions.map(o => `<option value="${o.id}" style="background-color: #161b22; color: #f0f6fc;">${o.label}</option>`).join('');
           const activeVisitor = visitorNicScanner.getActiveNicName();
           if (activeVisitor && allOptions.some(o => o.id === activeVisitor)) {
             nicSelect.value = activeVisitor;

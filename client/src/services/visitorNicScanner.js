@@ -64,16 +64,16 @@ export class VisitorNicScanner {
     const adapters = profile.adapters.map(adapter => {
       const copy = { ...adapter, isVisitorPc: true };
 
-      // If WebRTC found a local IP matching or detected
-      if (webrtcResult.localIps.length > 0) {
-        // If adapter is Ethernet/Wi-Fi and has no IP or matches detected IP
-        if (copy.type === 'Ethernet' || copy.type === 'Wi-Fi') {
-          const matchedIp = webrtcResult.localIps.find(ip => ip === copy.ipv4 || copy.ipv4 === '-');
-          if (matchedIp) {
-            copy.ipv4 = matchedIp;
-            copy.status = 'Up';
-            copy.isUp = true;
-          }
+      // If WebRTC found a valid local IPv4 matching or detected
+      const validIpv4s = webrtcResult.localIps.filter(ip => /^(\d{1,3}\.){3}\d{1,3}$/.test(ip));
+      if (validIpv4s.length > 0 && (copy.type === 'Ethernet' || copy.type === 'Wi-Fi')) {
+        if (copy.ipv4 === '-' || !copy.ipv4) {
+          copy.ipv4 = validIpv4s[0];
+          copy.status = 'Up';
+          copy.isUp = true;
+        } else if (validIpv4s.includes(copy.ipv4)) {
+          copy.status = 'Up';
+          copy.isUp = true;
         }
       }
 
@@ -164,8 +164,8 @@ export class VisitorNicScanner {
             }
 
             const cand = event.candidate.candidate;
-            // Match IPv4 addresses: 192.168.x.x, 10.x.x.x, 172.16-31.x.x or public
-            const ipMatches = cand.match(/([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/g);
+            // Match strict IPv4 addresses (4 octets 0-255)
+            const ipMatches = cand.match(/\b(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\b/g);
             if (ipMatches) {
               for (const ip of ipMatches) {
                 if (!ip.startsWith('0.') && ip !== '127.0.0.1') {
@@ -177,10 +177,14 @@ export class VisitorNicScanner {
               }
             }
 
-            // Also check for IPv6
-            const ipv6Match = cand.match(/([a-f0-9:]{10,})/i);
-            if (ipv6Match && !ipv6Match[1].startsWith('0:')) {
-              ips.add(ipv6Match[1]);
+            // Match valid IPv6 (must have at least 2 colons)
+            const ipv6Matches = cand.match(/\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b/g);
+            if (ipv6Matches) {
+              for (const ip6 of ipv6Matches) {
+                if (!ip6.startsWith('0:')) {
+                  ips.add(ip6);
+                }
+              }
             }
           };
         });

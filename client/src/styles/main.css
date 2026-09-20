@@ -157,7 +157,8 @@ body {
   background-color: rgba(248, 81, 73, 0.15);
 }
 
-.nw-select {
+.nw-select,
+select {
   background-color: var(--bg-panel-solid);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
@@ -167,10 +168,40 @@ body {
   font-size: 12px;
   cursor: pointer;
   outline: none;
+  color-scheme: dark;
 }
 
-.nw-select:focus {
+.nw-select:focus,
+select:focus {
   border-color: var(--brand);
+}
+
+.nw-select option,
+select option,
+optgroup {
+  background-color: #161b22 !important;
+  color: #f0f6fc !important;
+  padding: 6px 10px;
+}
+
+.nw-select option:checked,
+select option:checked {
+  background-color: #1f6feb !important;
+  color: #ffffff !important;
+}
+
+[data-theme="paper"] .nw-select,
+[data-theme="paper"] select {
+  color-scheme: light;
+  background-color: #ffffff;
+  color: #1f2328;
+}
+
+[data-theme="paper"] .nw-select option,
+[data-theme="paper"] select option,
+[data-theme="paper"] optgroup {
+  background-color: #ffffff !important;
+  color: #1f2328 !important;
 }
 
 /* Tabs Bar */
