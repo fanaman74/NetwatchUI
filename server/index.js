@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { ScenarioDriver } from './collectors/scenario.js';
 import { SystemCollector } from './collectors/system.js';
 import { generatePcapBinary } from './collectors/pcap.js';
+import { unifiService } from './services/unifi.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -698,6 +699,46 @@ app.get('/api/doctor', async (req, res) => {
   };
 
   res.json(report);
+});
+
+// --- UniFi Controller API Endpoints ---
+app.get('/api/unifi/status', (req, res) => {
+  res.json(unifiService.getStatus());
+});
+
+app.post('/api/unifi/test', async (req, res) => {
+  const result = await unifiService.testConnection(req.body);
+  res.json(result);
+});
+
+app.post('/api/unifi/config', async (req, res) => {
+  const result = await unifiService.configure(req.body);
+  res.json(result);
+});
+
+app.get('/api/unifi/health', async (req, res) => {
+  const health = await unifiService.getHealth();
+  res.json(health);
+});
+
+app.get('/api/unifi/devices', async (req, res) => {
+  const devices = await unifiService.getDevices();
+  res.json(devices);
+});
+
+app.get('/api/unifi/clients', async (req, res) => {
+  const clients = await unifiService.getClients();
+  res.json(clients);
+});
+
+app.post('/api/unifi/demo', (req, res) => {
+  const status = unifiService.enableDemoMode();
+  res.json({ success: true, message: 'Demo UniFi network loaded successfully!', status });
+});
+
+app.post('/api/unifi/disconnect', (req, res) => {
+  const status = unifiService.disconnect();
+  res.json({ success: true, message: 'UniFi controller disconnected.', status });
 });
 
 // Serve static client assets and SPA routing in production

@@ -10,6 +10,7 @@ import { TimelineTab } from './components/Tabs/TimelineTab.js';
 import { ProcessesTab } from './components/Tabs/ProcessesTab.js';
 import { DiagnoseTab } from './components/Tabs/DiagnoseTab.js';
 import { EgressTab } from './components/Tabs/EgressTab.js';
+import { UnifiTab } from './components/Tabs/UnifiTab.js';
 import { DenseView } from './components/Views/DenseView.js';
 import { LiteView } from './components/Views/LiteView.js';
 import { showHelpModal } from './components/Modals/HelpModal.js';
@@ -174,6 +175,9 @@ class NetWatchApp {
           <span class="nw-key-badge">0</span> Egress
           <span id="tab-egress-badge" class="nw-badge-count" style="display: none; background: var(--status-warn);">!</span>
         </button>
+        <button class="nw-tab" data-tab="11">
+          <span class="nw-key-badge">U</span> UniFi
+        </button>
       </nav>
 
       <!-- Main Workspace -->
@@ -189,9 +193,9 @@ class NetWatchApp {
             if (isIOS) {
               return `<span>📱 Touch / Swipe Navigation</span> <span>[Live / Demo]</span> <span>[Theme]</span> <span>[?] Help</span>`;
             } else if (isMac) {
-              return `<span>[⌘1-0] Tabs</span> <span>[V] View</span> <span>[T] Theme</span> <span>[D] Live/Demo</span> <span>[Space] Pause</span> <span>[⌘/] Filter</span> <span>[?] Help</span>`;
+              return `<span>[⌘1-0] Tabs</span> <span>[U] UniFi</span> <span>[V] View</span> <span>[T] Theme</span> <span>[D] Live/Demo</span> <span>[Space] Pause</span> <span>[⌘/] Filter</span> <span>[?] Help</span>`;
             }
-            return `<span>[1-0] Tabs</span> <span>[V] Cycle View</span> <span>[T] Theme</span> <span>[D] Live/Demo</span> <span>[P] Pause</span> <span>[/] Filter</span> <span>[?] Help</span>`;
+            return `<span>[1-0] Tabs</span> <span>[U] UniFi</span> <span>[V] Cycle View</span> <span>[T] Theme</span> <span>[D] Live/Demo</span> <span>[P] Pause</span> <span>[/] Filter</span> <span>[?] Help</span>`;
           })()}
         </div>
         <div id="footer-status" style="display: flex; gap: 14px; align-items: center;">
@@ -303,6 +307,7 @@ class NetWatchApp {
       case 8: this.activeTabComponent = new ProcessesTab(main); break;
       case 9: this.activeTabComponent = new DiagnoseTab(main); break;
       case 10: this.activeTabComponent = new EgressTab(main); break;
+      case 11: this.activeTabComponent = new UnifiTab(main); break;
     }
 
     if (this.latestData && this.activeTabComponent) {
@@ -433,6 +438,8 @@ class NetWatchApp {
         }
       } else if (e.key === '0') {
         this.switchTab(10);
+      } else if (e.key === 'u' || e.key === 'U') {
+        this.switchTab(11);
       }
     });
   }
