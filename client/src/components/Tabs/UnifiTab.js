@@ -378,12 +378,12 @@ export class UnifiTab {
     }
   }
 
-  async runConnectionTest() {
-    const testBtn = this.container.querySelector('#cfg-unifi-test-btn');
-    const resultBox = this.container.querySelector('#cfg-unifi-test-result');
-    let url = this.container.querySelector('#cfg-unifi-url').value.trim();
-    
-    // Auto-normalize URL (e.g. "https: /192.168.1.1", "192.168.1.1", trailing slashes)
+  sanitizeControllerUrl(raw) {
+    if (!raw) return '';
+    let url = String(raw).trim();
+    url = url.replace(/^["'`]+|["'`]+$/g, '').trim();
+    url = url.replace(/^(?:https?:[\s\/\\"'`]*)+/i, 'https://');
+
     if (/^http:\s*\/+/i.test(url)) {
       url = url.replace(/^http:\s*\/+/i, 'http://');
     } else if (/^https:\s*\/+/i.test(url)) {
@@ -391,7 +391,20 @@ export class UnifiTab {
     } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
-    url = url.replace(/\/+$/, '');
+
+    try {
+      const parsed = new URL(url);
+      url = parsed.origin;
+    } catch {
+      url = url.replace(/\/+$/, '');
+    }
+    return url;
+  }
+
+  async runConnectionTest() {
+    const testBtn = this.container.querySelector('#cfg-unifi-test-btn');
+    const resultBox = this.container.querySelector('#cfg-unifi-test-result');
+    let url = this.sanitizeControllerUrl(this.container.querySelector('#cfg-unifi-url').value);
     this.container.querySelector('#cfg-unifi-url').value = url;
 
     const authType = this.container.querySelector('input[name="unifi-auth-type"]:checked').value;
@@ -447,17 +460,7 @@ export class UnifiTab {
   async saveConfiguration() {
     const saveBtn = this.container.querySelector('#cfg-unifi-save-btn');
     const resultBox = this.container.querySelector('#cfg-unifi-test-result');
-    let url = this.container.querySelector('#cfg-unifi-url').value.trim();
-
-    // Auto-normalize URL (e.g. "https: /192.168.1.1", "192.168.1.1", trailing slashes)
-    if (/^http:\s*\/+/i.test(url)) {
-      url = url.replace(/^http:\s*\/+/i, 'http://');
-    } else if (/^https:\s*\/+/i.test(url)) {
-      url = url.replace(/^https:\s*\/+/i, 'https://');
-    } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'https://' + url;
-    }
-    url = url.replace(/\/+$/, '');
+    let url = this.sanitizeControllerUrl(this.container.querySelector('#cfg-unifi-url').value);
     this.container.querySelector('#cfg-unifi-url').value = url;
 
     const authType = this.container.querySelector('input[name="unifi-auth-type"]:checked').value;
