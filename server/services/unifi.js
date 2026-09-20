@@ -209,11 +209,15 @@ export class UnifiService {
             });
 
             if (res.status === 200) {
-              const cookie = res.headers['set-cookie'];
+              const rawCookie = res.headers['set-cookie'];
+              if (rawCookie) {
+                const list = Array.isArray(rawCookie) ? rawCookie : [rawCookie];
+                this.sessionCookie = list.map(c => c.split(';')[0].trim()).filter(Boolean).join('; ');
+              }
               return {
                 success: true,
                 message: 'Successfully authenticated with UniFi controller credentials!',
-                sessionCaptured: !!cookie
+                sessionCaptured: !!this.sessionCookie
               };
             } else if (res.status === 401 || res.status === 403) {
               lastErr = new Error('Invalid username or password on UniFi controller.');
@@ -244,8 +248,8 @@ export class UnifiService {
     this.config = { ...this.config, ...newConfig };
     this.isDemo = false;
 
-    // If credentials auth, perform actual login and store session cookie
-    if (this.config.authType === 'credentials') {
+    // If credentials auth and session cookie not yet captured, perform login and store cleaned cookie
+    if (this.config.authType === 'credentials' && !this.sessionCookie) {
       try {
         const loginRes = await this._rawRequest(this.config.controllerUrl, '/api/auth/login', {
           method: 'POST',
@@ -254,7 +258,8 @@ export class UnifiService {
           strictSsl: this.config.strictSsl
         });
         if (loginRes.headers['set-cookie']) {
-          this.sessionCookie = loginRes.headers['set-cookie'].join('; ');
+          const list = Array.isArray(loginRes.headers['set-cookie']) ? loginRes.headers['set-cookie'] : [loginRes.headers['set-cookie']];
+          this.sessionCookie = list.map(c => c.split(';')[0].trim()).filter(Boolean).join('; ');
         }
       } catch {
         // Fallback to legacy login
@@ -266,7 +271,8 @@ export class UnifiService {
             strictSsl: this.config.strictSsl
           });
           if (legacyRes.headers['set-cookie']) {
-            this.sessionCookie = legacyRes.headers['set-cookie'].join('; ');
+            const list = Array.isArray(legacyRes.headers['set-cookie']) ? legacyRes.headers['set-cookie'] : [legacyRes.headers['set-cookie']];
+            this.sessionCookie = list.map(c => c.split(';')[0].trim()).filter(Boolean).join('; ');
           }
         } catch {
           // ignore
