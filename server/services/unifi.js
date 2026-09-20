@@ -2,7 +2,13 @@
 // Handles UniFi OS (UDM, Cloud Key, Cloud Gateway) and Standalone UniFi Network Application APIs
 import https from 'https';
 import http from 'http';
-import { URL } from 'url';
+import { URL, fileURLToPath } from 'url';
+import fs from 'fs';
+import path from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const CONFIG_FILE = path.join(__dirname, '../unifi-config.json');
 
 export class UnifiService {
   constructor() {
@@ -17,9 +23,36 @@ export class UnifiService {
     };
 
     this.sessionCookie = null;
-    this.isDemo = true; // Default to demo so UI is instantly rich and testable
+    this.isDemo = true; // Default to demo if no saved credentials
     this.lastSync = new Date().toISOString();
     this.cachedData = null;
+
+    this.loadSavedConfig();
+  }
+
+  loadSavedConfig() {
+    try {
+      if (fs.existsSync(CONFIG_FILE)) {
+        const raw = fs.readFileSync(CONFIG_FILE, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.controllerUrl && (parsed.apiKey || (parsed.username && parsed.password))) {
+          this.config = { ...this.config, ...parsed };
+          this.isDemo = false;
+          console.log('[UniFi] Restored saved controller configuration for:', this.config.controllerUrl);
+        }
+      }
+    } catch (err) {
+      console.warn('[UniFi] Could not load saved config:', err.message);
+    }
+  }
+
+  saveConfigToDisk() {
+    try {
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify(this.config, null, 2), 'utf8');
+      console.log('[UniFi] Persisted controller configuration to disk.');
+    } catch (err) {
+      console.warn('[UniFi] Could not save config to disk:', err.message);
+    }
   }
 
   getStatus() {
@@ -88,13 +121,16 @@ export class UnifiService {
   }
 
   disconnect() {
-    this.isDemo = false;
+    this.isDemo = true;
     this.sessionCookie = null;
     this.config.controllerUrl = '';
     this.config.apiKey = '';
     this.config.username = '';
     this.config.password = '';
     this.cachedData = null;
+    try {
+      if (fs.existsSync(CONFIG_FILE)) fs.unlinkSync(CONFIG_FILE);
+    } catch {}
     return this.getStatus();
   }
 
@@ -314,6 +350,7 @@ export class UnifiService {
       }
     }
 
+    this.saveConfigToDisk();
     this.lastSync = new Date().toISOString();
     return { success: true, message: 'UniFi Controller connected successfully!' };
   }

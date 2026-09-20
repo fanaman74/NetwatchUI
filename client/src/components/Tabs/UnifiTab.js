@@ -43,7 +43,7 @@ export class UnifiTab {
         </div>
 
         <!-- Live Connect Callout Banner -->
-        <div class="nw-unifi-connect-banner" style="background: linear-gradient(90deg, rgba(0, 210, 255, 0.12), rgba(31, 111, 235, 0.12)); border: 1px solid var(--brand); border-radius: 8px; padding: 12px 16px; margin-top: 12px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <div id="unifi-connect-banner" class="nw-unifi-connect-banner" style="${localStorage.getItem('nw_unifi_configured') === 'true' ? 'display: none;' : 'display: flex;'} background: linear-gradient(90deg, rgba(0, 210, 255, 0.12), rgba(31, 111, 235, 0.12)); border: 1px solid var(--brand); border-radius: 8px; padding: 12px 16px; margin-top: 12px; margin-bottom: 6px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
           <div style="display: flex; align-items: center; gap: 10px;">
             <span style="font-size: 24px;">🔑</span>
             <div>
@@ -508,6 +508,9 @@ export class UnifiTab {
         if (data.resolvedUrl) {
           this.container.querySelector('#cfg-unifi-url').value = data.resolvedUrl;
         }
+        localStorage.setItem('nw_unifi_configured', 'true');
+        const connectBanner = this.container.querySelector('#unifi-connect-banner');
+        if (connectBanner) connectBanner.style.display = 'none';
         this.closeConfigModal();
         await this.loadData();
       } else {
@@ -610,6 +613,17 @@ export class UnifiTab {
         statusPill.style.background = 'rgba(255, 255, 255, 0.08)';
         statusPill.style.color = 'var(--text-muted)';
         statusPill.textContent = '○ NOT CONFIGURED';
+      }
+    }
+
+    const connectBanner = this.container.querySelector('#unifi-connect-banner');
+    if (connectBanner) {
+      if (this.status && !this.status.isDemo && this.status.connected) {
+        connectBanner.style.display = 'none';
+        localStorage.setItem('nw_unifi_configured', 'true');
+      } else {
+        connectBanner.style.display = 'flex';
+        localStorage.removeItem('nw_unifi_configured');
       }
     }
 
