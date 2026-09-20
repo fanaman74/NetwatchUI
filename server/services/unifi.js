@@ -55,14 +55,41 @@ export class UnifiService {
     }
   }
 
-  getStatus() {
+  getConfig() {
     return {
-      connected: this.isDemo || !!(this.config.controllerUrl && (this.config.apiKey || this.sessionCookie)),
+      controllerUrl: this.config.controllerUrl || '',
+      authType: this.config.authType || 'apiKey',
+      apiKey: this.config.apiKey || '',
+      username: this.config.username || '',
+      site: this.config.site || 'default',
+      strictSsl: !!this.config.strictSsl,
       isDemo: this.isDemo,
+      hasSavedConfig: !!(this.config.controllerUrl && (this.config.apiKey || (this.config.username && this.config.password)))
+    };
+  }
+
+  reconnectSaved() {
+    this.loadSavedConfig();
+    if (this.config.controllerUrl && (this.config.apiKey || (this.config.username && this.config.password))) {
+      this.isDemo = false;
+      this.lastSync = new Date().toISOString();
+      return { success: true, message: 'Reconnected to live UniFi controller!', status: this.getStatus() };
+    }
+    return { success: false, error: 'No saved controller configuration found on disk.' };
+  }
+
+  getStatus() {
+    const hasSavedConfig = !!(this.config.controllerUrl && (this.config.apiKey || (this.config.username && this.config.password)));
+    return {
+      connected: !this.isDemo && hasSavedConfig,
+      isDemo: this.isDemo,
+      hasSavedConfig,
       controllerUrl: this.config.controllerUrl || (this.isDemo ? 'https://192.168.1.1 (Demo Controller)' : ''),
-      authType: this.config.authType,
-      site: this.config.site,
-      strictSsl: this.config.strictSsl,
+      authType: this.config.authType || 'apiKey',
+      apiKey: this.config.apiKey || '',
+      username: this.config.username || '',
+      site: this.config.site || 'default',
+      strictSsl: !!this.config.strictSsl,
       lastSync: this.lastSync,
       controllerInfo: this.getControllerInfo()
     };
@@ -186,7 +213,28 @@ export class UnifiService {
   }
 
   async testConnection(targetConfig) {
-    const cfg = { ...this.config, ...targetConfig };
+    const rawUrl = targetConfig.controllerUrl || this.config.controllerUrl;
+    const sanitizedUrl = this.sanitizeControllerUrl(rawUrl);
+    const cfg = {
+      ...this.config,
+      ...targetConfig,
+      controllerUrl: sanitizedUrl
+    };
+
+    // If targetConfig field is blank/empty, preserve existing saved config
+    if ((!targetConfig.apiKey || !targetConfig.apiKey.trim()) && this.config.apiKey) {
+      cfg.apiKey = this.config.apiKey;
+    }
+    if ((!targetConfig.password) && this.config.password) {
+      cfg.password = this.config.password;
+    }
+    if ((!targetConfig.username || !targetConfig.username.trim()) && this.config.username) {
+      cfg.username = this.config.username;
+    }
+    if ((!targetConfig.site || !targetConfig.site.trim()) && this.config.site) {
+      cfg.site = this.config.site;
+    }
+
     if (!cfg.controllerUrl) {
       return { success: false, error: 'Controller URL is required (e.g. https://192.168.1.1)' };
     }
@@ -304,7 +352,22 @@ export class UnifiService {
   }
 
   async configure(newConfig) {
-    newConfig.controllerUrl = this.sanitizeControllerUrl(newConfig.controllerUrl);
+    const rawUrl = newConfig.controllerUrl || this.config.controllerUrl;
+    newConfig.controllerUrl = this.sanitizeControllerUrl(rawUrl);
+
+    // If newConfig credentials are blank, preserve existing
+    if ((!newConfig.apiKey || !newConfig.apiKey.trim()) && this.config.apiKey) {
+      newConfig.apiKey = this.config.apiKey;
+    }
+    if ((!newConfig.password) && this.config.password) {
+      newConfig.password = this.config.password;
+    }
+    if ((!newConfig.username || !newConfig.username.trim()) && this.config.username) {
+      newConfig.username = this.config.username;
+    }
+    if ((!newConfig.site || !newConfig.site.trim()) && this.config.site) {
+      newConfig.site = this.config.site;
+    }
 
     const test = await this.testConnection(newConfig);
     if (!test.success) {
@@ -352,7 +415,12 @@ export class UnifiService {
 
     this.saveConfigToDisk();
     this.lastSync = new Date().toISOString();
-    return { success: true, message: 'UniFi Controller connected successfully!' };
+    return {
+      success: true,
+      message: 'UniFi Controller connected and configuration saved successfully to disk!',
+      config: this.getConfig(),
+      status: this.getStatus()
+    };
   }
 
   async getHealth() {

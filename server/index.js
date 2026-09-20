@@ -740,6 +740,15 @@ app.post('/api/unifi/test', async (req, res) => {
   }
 });
 
+app.get('/api/unifi/config', (req, res) => {
+  res.json(unifiService.getConfig());
+});
+
+app.post('/api/unifi/reconnect', (req, res) => {
+  const result = unifiService.reconnectSaved();
+  res.json(result);
+});
+
 app.post('/api/unifi/config', async (req, res) => {
   console.log('[UniFi API] Received /api/unifi/config request:', {
     controllerUrl: req.body?.controllerUrl,

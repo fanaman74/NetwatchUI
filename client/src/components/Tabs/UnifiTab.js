@@ -165,6 +165,10 @@ export class UnifiTab {
               Connect to your local <strong>UniFi Dream Machine (UDM)</strong>, <strong>UniFi Cloud Key</strong>, <strong>Cloud Gateway</strong>, or self-hosted UniFi Network Application. Requests are safely proxied via NetWatch's backend.
             </div>
 
+            <!-- Current Persisted Status Badge -->
+            <div id="cfg-unifi-current-status" style="display: none; padding: 10px 12px; border-radius: 6px; font-size: 11.5px; line-height: 1.4; background: rgba(63, 185, 80, 0.12); border: 1px solid rgba(63, 185, 80, 0.35); color: var(--status-good);">
+            </div>
+
             <!-- Controller URL -->
             <div>
               <label style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px; color: var(--text-primary);">
@@ -274,17 +278,26 @@ export class UnifiTab {
       });
     }
 
-    // Demo Button
+    // Demo / Live Toggle Button
     const demoBtn = this.container.querySelector('#unifi-demo-btn');
     if (demoBtn) {
       demoBtn.addEventListener('click', async () => {
         try {
-          const res = await fetch('/api/unifi/demo', { method: 'POST' });
-          if (res.ok) {
-            await this.loadData();
+          if (this.status && this.status.isDemo && this.status.hasSavedConfig) {
+            demoBtn.innerHTML = '<span>⏳ Connecting Live...</span>';
+            const res = await fetch('/api/unifi/reconnect', { method: 'POST' });
+            if (res.ok) {
+              await this.loadData();
+            }
+          } else {
+            demoBtn.innerHTML = '<span>⏳ Loading Demo...</span>';
+            const res = await fetch('/api/unifi/demo', { method: 'POST' });
+            if (res.ok) {
+              await this.loadData();
+            }
           }
         } catch (err) {
-          console.error('[UniFi] Demo trigger error:', err);
+          console.error('[UniFi] Demo/Live trigger error:', err);
         }
       });
     }
@@ -538,13 +551,82 @@ export class UnifiTab {
     }
   }
 
-  openConfigModal() {
+  async openConfigModal() {
     const modal = this.container.querySelector('#unifi-config-modal');
-    if (modal) {
-      modal.style.display = 'flex';
-      const urlInput = this.container.querySelector('#cfg-unifi-url');
-      if (urlInput && this.status && this.status.controllerUrl && !this.status.isDemo) {
-        urlInput.value = this.status.controllerUrl;
+    if (!modal) return;
+    modal.style.display = 'flex';
+
+    const resultBox = this.container.querySelector('#cfg-unifi-test-result');
+    if (resultBox) resultBox.style.display = 'none';
+
+    // Populate from active status immediately
+    if (this.status) {
+      this.populateModalFields(this.status);
+    }
+
+    // Then fetch persisted config from disk to ensure freshest values
+    try {
+      const res = await fetch('/api/unifi/config');
+      if (res.ok) {
+        const cfg = await res.json();
+        this.populateModalFields(cfg);
+      }
+    } catch (err) {
+      console.warn('[UniFi] Could not load persisted config in modal:', err.message);
+    }
+  }
+
+  populateModalFields(cfg) {
+    if (!cfg) return;
+    const urlInput = this.container.querySelector('#cfg-unifi-url');
+    const apiKeyInput = this.container.querySelector('#cfg-unifi-apikey');
+    const usernameInput = this.container.querySelector('#cfg-unifi-username');
+    const siteInput = this.container.querySelector('#cfg-unifi-site');
+    const selfSignedCheck = this.container.querySelector('#cfg-unifi-selfsigned');
+    const currentStatusBox = this.container.querySelector('#cfg-unifi-current-status');
+    const apikeyGroup = this.container.querySelector('#cfg-unifi-apikey-group');
+    const credsGroup = this.container.querySelector('#cfg-unifi-creds-group');
+
+    if (urlInput && cfg.controllerUrl && !cfg.controllerUrl.includes('(Demo')) {
+      urlInput.value = cfg.controllerUrl;
+    }
+    if (apiKeyInput && cfg.apiKey) {
+      apiKeyInput.value = cfg.apiKey;
+    }
+    if (usernameInput && cfg.username) {
+      usernameInput.value = cfg.username;
+    }
+    if (siteInput && cfg.site) {
+      siteInput.value = cfg.site;
+    }
+    if (selfSignedCheck) {
+      selfSignedCheck.checked = cfg.strictSsl === false;
+    }
+
+    const authType = cfg.authType || 'apiKey';
+    const radio = this.container.querySelector(`input[name="unifi-auth-type"][value="${authType}"]`);
+    if (radio) {
+      radio.checked = true;
+      if (apikeyGroup && credsGroup) {
+        if (authType === 'apiKey') {
+          apikeyGroup.style.display = 'block';
+          credsGroup.style.display = 'none';
+        } else {
+          apikeyGroup.style.display = 'none';
+          credsGroup.style.display = 'flex';
+        }
+      }
+    }
+
+    if (currentStatusBox) {
+      const hasKey = !!cfg.apiKey;
+      const hasCreds = !!(cfg.username && cfg.password);
+      if (cfg.hasSavedConfig || hasKey || hasCreds) {
+        currentStatusBox.style.display = 'block';
+        const maskedKey = hasKey ? `${cfg.apiKey.slice(0, 6)}••••••••${cfg.apiKey.slice(-4)}` : '(configured)';
+        currentStatusBox.innerHTML = `💾 <strong>Persisted Configuration Loaded</strong>: Controller: <code>${cfg.controllerUrl}</code> · Site: <code>${cfg.site || 'default'}</code> ${hasKey ? `· API Key: <code>${maskedKey}</code>` : `· User: <code>${cfg.username}</code>`}`;
+      } else {
+        currentStatusBox.style.display = 'none';
       }
     }
   }
@@ -625,12 +707,29 @@ export class UnifiTab {
 
     const connectBanner = this.container.querySelector('#unifi-connect-banner');
     if (connectBanner) {
-      if (this.status && !this.status.isDemo && this.status.connected) {
+      if (this.status && (this.status.hasSavedConfig || (!this.status.isDemo && this.status.connected))) {
         connectBanner.style.display = 'none';
         localStorage.setItem('nw_unifi_configured', 'true');
       } else {
         connectBanner.style.display = 'flex';
         localStorage.removeItem('nw_unifi_configured');
+      }
+    }
+
+    const demoBtn = this.container.querySelector('#unifi-demo-btn');
+    if (demoBtn && this.status) {
+      if (this.status.isDemo && this.status.hasSavedConfig) {
+        demoBtn.innerHTML = '<span>🌐 Switch to Live UDM</span>';
+        demoBtn.title = 'Reconnect to your saved live UniFi Controller';
+        demoBtn.style.background = 'rgba(63, 185, 80, 0.15)';
+        demoBtn.style.color = 'var(--status-good)';
+        demoBtn.style.borderColor = 'var(--status-good)';
+      } else {
+        demoBtn.innerHTML = '<span>🧪 Demo Lab</span>';
+        demoBtn.title = 'Load Demo Network';
+        demoBtn.style.background = '';
+        demoBtn.style.color = '';
+        demoBtn.style.borderColor = '';
       }
     }
 
