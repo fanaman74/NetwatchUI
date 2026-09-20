@@ -14,6 +14,7 @@ import { DenseView } from './components/Views/DenseView.js';
 import { LiteView } from './components/Views/LiteView.js';
 import { showHelpModal } from './components/Modals/HelpModal.js';
 import { DoctorScreen } from './components/DoctorScreen.js';
+import { visitorNicScanner } from './services/visitorNicScanner.js';
 
 const THEMES = ['dark', 'dracula', 'nord', 'ocean', 'solarized', 'sky', 'paper', 'terminal'];
 
@@ -25,6 +26,9 @@ class NetWatchApp {
     this.activeTabComponent = null;
     this.viewComponent = null;
     this.latestData = null;
+
+    // Proactively scan visitor PC NICs on every page load
+    visitorNicScanner.scan().catch(() => {});
 
     this.applyTheme(this.currentTheme);
     this.initDOM();
@@ -182,6 +186,7 @@ class NetWatchApp {
     if (nicSelect) {
       nicSelect.addEventListener('change', async (e) => {
         const newNic = e.target.value;
+        visitorNicScanner.setActiveNic(newNic);
         await telemetry.setSelectedInterface(newNic);
       });
     }
@@ -428,27 +433,51 @@ class NetWatchApp {
   }
 
   updateHeaderAndStatus(data) {
-    // Multi-NIC selector in header
-    const ifaces = data.interfaces || [];
+    // Multi-NIC selector in header (Visitor PC Adapters + Cloud Host Interfaces)
+    const serverIfaces = data.interfaces || [];
+    const visitorAdapters = visitorNicScanner.cachedResult?.adapters || [];
     const nicContainer = document.querySelector('#nic-selector-container');
     const nicSelect = document.querySelector('#nic-select');
+
+    const allOptions = [];
+    for (const va of visitorAdapters) {
+      allOptions.push({
+        id: va.name,
+        label: `💻 Client: ${va.name} (${va.ipv4 !== '-' ? va.ipv4 : 'No IP'})`,
+        isVisitor: true
+      });
+    }
+    for (const si of serverIfaces) {
+      if (!allOptions.some(o => o.id === si.name)) {
+        const typeIcon = si.type === 'Wi-Fi' ? '📶' : (si.type === 'Loopback' ? '🔄' : '🔌');
+        const shortIp = si.ipv4 ? si.ipv4.split('/')[0] : 'No IP';
+        allOptions.push({
+          id: si.name,
+          label: `☁️ Host: ${typeIcon} ${si.name} (${shortIp})`,
+          isVisitor: false
+        });
+      }
+    }
+
     if (nicContainer && nicSelect) {
-      if (ifaces.length > 1) {
+      if (allOptions.length > 1) {
         nicContainer.style.display = 'flex';
-        const ifaceKeys = ifaces.map(i => `${i.name}:${i.ipv4}`).join('|');
-        if (nicSelect.dataset.keys !== ifaceKeys) {
-          nicSelect.dataset.keys = ifaceKeys;
+        const optKeys = allOptions.map(o => o.id).join('|');
+        if (nicSelect.dataset.keys !== optKeys) {
+          nicSelect.dataset.keys = optKeys;
           const currentVal = nicSelect.value;
-          nicSelect.innerHTML = ifaces.map(i => {
-            const typeIcon = i.type === 'Wi-Fi' ? '📶' : (i.type === 'Loopback' ? '🔄' : '🔌');
-            const shortIp = i.ipv4 ? i.ipv4.split('/')[0] : 'No IP';
-            return `<option value="${i.name}">${typeIcon} ${i.name} (${shortIp})</option>`;
-          }).join('');
-          if (currentVal && ifaces.some(i => i.name === currentVal)) {
+          nicSelect.innerHTML = allOptions.map(o => `<option value="${o.id}">${o.label}</option>`).join('');
+          const activeVisitor = visitorNicScanner.getActiveNicName();
+          if (activeVisitor && allOptions.some(o => o.id === activeVisitor)) {
+            nicSelect.value = activeVisitor;
+          } else if (currentVal && allOptions.some(o => o.id === currentVal)) {
             nicSelect.value = currentVal;
           }
         }
-        if (data.selectedInterface && nicSelect.value !== data.selectedInterface) {
+        const activeVisitor = visitorNicScanner.getActiveNicName();
+        if (activeVisitor && nicSelect.value !== activeVisitor && allOptions.some(o => o.id === activeVisitor)) {
+          nicSelect.value = activeVisitor;
+        } else if (data.selectedInterface && nicSelect.value !== data.selectedInterface && allOptions.some(o => o.id === data.selectedInterface)) {
           nicSelect.value = data.selectedInterface;
         }
       } else {

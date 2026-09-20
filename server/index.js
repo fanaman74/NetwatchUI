@@ -350,6 +350,38 @@ function broadcastTelemetry() {
 
 // REST API Endpoints
 
+app.get('/api/client-info', (req, res) => {
+  const forwarded = req.headers['x-forwarded-for'];
+  const clientIp = (forwarded ? forwarded.split(',')[0].trim() : req.socket.remoteAddress) || '';
+  const isLocalClient = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp.includes('127.0.0.1') || req.hostname === 'localhost';
+  const isCloudHost = !!process.env.RAILWAY_ENVIRONMENT || !!process.env.DOCKER || (process.platform === 'linux' && fs.existsSync('/.dockerenv'));
+
+  res.json({
+    clientIp,
+    isLocalClient,
+    isCloudHost,
+    userAgent: req.headers['user-agent'] || '',
+    serverPlatform: process.platform,
+    hostname: os.hostname()
+  });
+});
+
+app.get('/api/client/nics', async (req, res) => {
+  try {
+    const nics = await systemCollector.getNicsDetail();
+    res.json({
+      success: true,
+      platform: {
+        os: `${os.type()} ${os.release()} (${os.platform()})`,
+        hostname: os.hostname()
+      },
+      nics
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/status', (req, res) => {
   res.json({
     status: 'ONLINE',
@@ -522,14 +554,14 @@ app.get('/api/doctor', async (req, res) => {
         }
       },
       {
-        id: 'nic_discovery',
-        name: 'Network Interface Cards (NICs) & Physical Adapters',
+        id: 'backend_nic_discovery',
+        name: 'Backend Host & Cloud Gateway Interfaces',
         state: activeNics.length > 0 ? 'ready' : (physicalNics.length > 0 ? 'degraded' : 'unavailable'),
         detail: activeNics.length > 0
-          ? `${nics.length} NICs discovered (${activeNics.length} online). Primary: ${primaryNic?.name} (${primaryNic?.description || primaryNic?.type}) · ${primaryNic?.ipv4} @ ${primaryNic?.linkSpeed}.`
+          ? `${nics.length} backend interface(s) discovered (${activeNics.length} online). Active: ${primaryNic?.name} (${primaryNic?.description || primaryNic?.type}) · ${primaryNic?.ipv4} @ ${primaryNic?.linkSpeed}.`
           : (physicalNics.length > 0
-            ? `${physicalNics.length} physical NIC(s) detected, but no adapter is currently connected with an active IP address.`
-            : 'No physical or virtual network interface cards detected on this host.'),
+            ? `${physicalNics.length} physical NIC(s) detected on server host, but no adapter is currently connected with an active IP address.`
+            : 'No physical or virtual network interface cards detected on backend host.'),
         nics: nics,
         selectedNic: selectedInterface || (primaryNic ? primaryNic.name : ''),
         interfaces: ifaceNames,

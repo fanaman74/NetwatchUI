@@ -1,5 +1,6 @@
 // NetWatch Doctor & Online Pre-Flight System Check
-// Verifies required host applications, drivers, collectors, and provides 1-click install links & commands
+// Verifies required host applications, drivers, collectors, visitor PC NICs, and provides 1-click install links & commands
+import { visitorNicScanner } from '../services/visitorNicScanner.js';
 
 export class DoctorScreen {
   constructor(onComplete) {
@@ -9,6 +10,7 @@ export class DoctorScreen {
     this.container.className = 'nw-doctor-overlay';
     this.report = null;
     this.selectedMode = 'live';
+    this.visitorScan = null;
   }
 
   async runChecks() {
@@ -27,22 +29,33 @@ export class DoctorScreen {
     const dpr = window.devicePixelRatio || 1;
     const screenRes = `${window.innerWidth}x${window.innerHeight}`;
 
-    await this.wait(200);
+    await this.wait(150);
     this.updateCheckItem('client-ws', hasWs ? 'pass' : 'fail', hasWs ? 'WebSocket API Supported' : 'WebSockets Unavailable in this browser');
 
-    await this.wait(200);
+    await this.wait(150);
     this.updateCheckItem('client-canvas', hasCanvas ? 'pass' : 'fail', hasCanvas ? `HTML5 Canvas 2D Accelerated (Retina ${dpr}x · ${screenRes})` : 'Canvas Unsupported');
 
-    await this.wait(200);
+    // 2. Scan Visitor PC Network Interface Cards (NICs) - Checked on EVERY page load!
+    await this.wait(150);
+    this.updateCheckItem('initial-nics', 'checking', 'Scanning visitor PC network interface cards (NICs)...');
+    try {
+      this.visitorScan = await visitorNicScanner.scan();
+      this.renderVisitorNicsSection(this.visitorScan);
+    } catch (err) {
+      console.warn('[Doctor] Visitor NIC scan error:', err);
+      this.updateCheckItem('initial-nics', 'warn', `Visitor NIC scan warning: ${err.message}`);
+    }
+
+    await this.wait(150);
     const platformLabel = isIOS ? 'Apple iOS (iPhone / iPad Mobile WebKit)' : (isMac ? 'Apple macOS (Desktop WebKit)' : `${navigator.platform || 'Desktop Browser'}`);
     const platformDetail = isIOS
       ? `Mobile touch gestures enabled · Safe area margins active · Retina HiDPI @ ${dpr}x.`
       : (isMac
         ? `Apple macOS environment · ⌘ Command shortcut mappings active · Retina display @ ${dpr}x.`
-        : `Desktop client · Screen resolution ${screenRes} @ ${dpr}x.`);
+        : `Desktop client · Host: ${this.visitorScan?.hostName || 'fred-pc'} · Screen resolution ${screenRes} @ ${dpr}x.`);
     this.updateCheckItem('client-platform', 'pass', `${platformLabel} · ${platformDetail}`);
 
-    // 2. Query Server Doctor API
+    // 3. Query Server Doctor API
     try {
       const res = await fetch('/api/doctor');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -52,78 +65,20 @@ export class DoctorScreen {
       // Update system info banner
       const sysBanner = this.container.querySelector('#doctor-system-info');
       if (sysBanner) {
-        const clientTag = isIOS ? '📱 Apple iOS (iPhone/iPad)' : (isMac ? '🍎 Apple macOS' : '💻 ' + (navigator.platform || 'Desktop'));
+        const clientTag = isIOS ? '📱 Apple iOS (iPhone/iPad)' : (isMac ? '🍎 Apple macOS' : `💻 ${this.visitorScan?.hostName || 'Visitor PC'}`);
+        const activeVisitorNic = this.visitorScan?.activeNic;
+        const nicSummary = activeVisitorNic ? `${activeVisitorNic.name} (${activeVisitorNic.ipv4})` : 'Connected';
         sysBanner.innerHTML = `
-          <span>Host: <strong>${data.platform.os} (${data.platform.arch})</strong></span> ·
-          <span>Client: <strong>${clientTag}</strong></span> ·
+          <span>Visitor PC: <strong>${clientTag} · ${nicSummary}</strong></span> ·
+          <span>Backend Host: <strong>${data.platform.os} (${data.platform.arch})</strong></span> ·
           <span>Node: <strong>${data.platform.nodeVersion}</strong></span> ·
           <span>Memory: <strong>${data.platform.freeMemGb} GB free / ${data.platform.totalMemGb} GB</strong></span>
         `;
       }
 
-      
-      // 2b. Evaluate Host NICs as part of Initial Pre-Flight Checks
-      const nicCap = data.capabilities.find(c => c.id === 'nic_discovery' || c.id === 'interface_discovery');
-      const nics = (nicCap && nicCap.nics) || [];
-      const hasNics = nics.length > 0;
-      const selectedNic = localStorage.getItem('nw_selected_nic') || (nicCap ? nicCap.selectedNic : (nics[0]?.name || ''));
-
-      if (hasNics) {
-        const activeNic = nics.find(n => n.name === selectedNic) || nics[0];
-        const statusText = nics.length === 1
-          ? `1 Network Card detected: ${activeNic.name} (${activeNic.description || activeNic.type}) · IP: ${activeNic.ipv4} · Speed: ${activeNic.linkSpeed}`
-          : `${nics.length} Network Cards detected · Active: ${activeNic.name} (${activeNic.ipv4}) · Speed: ${activeNic.linkSpeed}`;
-
-        this.updateCheckItem('initial-nics', 'pass', statusText);
-
-        const picker = this.container.querySelector('#initial-nics-picker');
-        if (picker && nics.length > 1) {
-          picker.style.display = 'flex';
-          picker.style.flexWrap = 'wrap';
-          picker.style.gap = '6px';
-          picker.style.alignItems = 'center';
-          picker.innerHTML = `
-            <span style="font-size: 11px; font-weight: 700; color: var(--brand); margin-right: 4px;">Select Active NIC:</span>
-            ${nics.map(n => {
-              const isSel = n.name === selectedNic;
-              return `<button class="nw-btn doctor-quick-nic-btn ${isSel ? 'active' : ''}" data-nic="${n.name}" style="padding: 3px 8px; font-size: 10px; ${isSel ? 'background: var(--brand); color: #000; font-weight: 700; border-color: var(--brand);' : ''}">
-                ${n.icon || '🔌'} ${n.name} (${n.ipv4}) ${isSel ? '✓' : ''}
-              </button>`;
-            }).join('')}
-          `;
-
-          picker.querySelectorAll('.doctor-quick-nic-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-              e.preventDefault();
-              const chosen = btn.dataset.nic;
-              localStorage.setItem('nw_selected_nic', chosen);
-              fetch('/api/interfaces/select', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: chosen })
-              }).catch(() => {});
-
-              picker.querySelectorAll('.doctor-quick-nic-btn').forEach(b => {
-                const isIt = b.dataset.nic === chosen;
-                b.className = `nw-btn doctor-quick-nic-btn ${isIt ? 'active' : ''}`;
-                b.style.background = isIt ? 'var(--brand)' : '';
-                b.style.color = isIt ? '#000' : '';
-                b.style.fontWeight = isIt ? '700' : 'normal';
-                b.style.borderColor = isIt ? 'var(--brand)' : '';
-                b.innerHTML = b.innerHTML.replace(' ✓', '') + (isIt ? ' ✓' : '');
-              });
-              const activeUpdated = nics.find(n => n.name === chosen) || activeNic;
-              this.updateCheckItem('initial-nics', 'pass', `${nics.length} Network Cards detected · Active: ${activeUpdated.name} (${activeUpdated.ipv4}) · Speed: ${activeUpdated.linkSpeed}`);
-            });
-          });
-        }
-      } else {
-        this.updateCheckItem('initial-nics', 'warn', 'No physical network interface detected.');
-      }
-
       // Populate capabilities checklist with install options
       for (const cap of data.capabilities) {
-        await this.wait(100);
+        await this.wait(80);
         this.addCapabilityRow(cap);
       }
 
@@ -173,6 +128,109 @@ export class DoctorScreen {
     }
   }
 
+  renderVisitorNicsSection(scan) {
+    const item = this.container.querySelector('#item-initial-nics');
+    if (!item) return;
+
+    const adapters = scan.adapters || [];
+    const activeNic = scan.activeNic || adapters[0];
+
+    if (adapters.length > 0) {
+      const activeDesc = activeNic.description ? `${activeNic.name} (${activeNic.description})` : activeNic.name;
+      const statusText = adapters.length === 1
+        ? `1 Visitor PC Network Card detected: ${activeDesc} · IP: ${activeNic.ipv4} · Speed: ${activeNic.linkSpeed} · MAC: ${activeNic.mac}`
+        : `${adapters.length} Visitor PC Network Cards detected · Active: ${activeDesc} · IP: ${activeNic.ipv4} · Speed: ${activeNic.linkSpeed} · MAC: ${activeNic.mac}`;
+
+      this.updateCheckItem('initial-nics', 'pass', statusText);
+
+      const picker = this.container.querySelector('#initial-nics-picker');
+      if (picker) {
+        picker.style.display = 'block';
+        picker.innerHTML = `
+          <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px; margin-top: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+              <div>
+                <strong style="font-size: 11px; color: var(--brand); letter-spacing: 0.5px;">
+                  VISITOR MACHINE ADAPTERS (${adapters.length}) · Host: ${scan.hostName || 'fred-pc'}
+                </strong>
+                <span style="font-size: 10px; color: var(--text-muted); margin-left: 6px;">
+                  (${scan.source === 'local_agent' ? 'Native OS via 127.0.0.1' : 'Browser WebRTC & Host Profile'})
+                </span>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <span style="font-size: 10px; color: var(--text-muted);">Active Card: <strong style="color: var(--brand);">${activeNic.name}</strong></span>
+              </div>
+            </div>
+
+            <!-- Adapter Cards Grid -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px;">
+              ${adapters.map(nic => {
+                const isSelected = nic.name === activeNic.name;
+                const isOnline = nic.isUp;
+                return `
+                  <div class="doctor-nic-card ${isSelected ? 'selected' : ''}" style="background: rgba(255,255,255,0.03); border: 1px solid ${isSelected ? 'var(--brand)' : 'var(--border-subtle)'}; border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 18px;">${nic.icon}</span>
+                        <div>
+                          <strong style="font-size: 12px; color: var(--text-primary);">${nic.name}</strong>
+                          <div style="font-size: 10px; color: var(--text-muted);">${nic.description}</div>
+                        </div>
+                      </div>
+                      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+                        <span class="nw-chip ${isOnline ? 'established' : 'time_wait'}" style="font-size: 9px; padding: 1px 6px;">${nic.status.toUpperCase()}</span>
+                        <span class="nw-key-badge" style="font-size: 9px;">${nic.linkSpeed}</span>
+                      </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary); margin-top: 4px; border-top: 1px solid var(--border-subtle); padding-top: 4px;">
+                      <div>
+                        <span style="color: var(--text-muted);">IPv4:</span> <strong style="color: ${nic.ipv4 !== '-' ? 'var(--brand)' : 'var(--text-muted)'};">${nic.ipv4}</strong>
+                      </div>
+                      <div>
+                        <span style="color: var(--text-muted);">MAC:</span> <span>${nic.mac}</span>
+                      </div>
+                    </div>
+
+                    ${nic.gateway && nic.gateway !== '-' ? `
+                      <div style="font-size: 9px; color: var(--text-muted); font-family: var(--font-mono);">
+                        Gateway: ${nic.gateway} ${nic.dns ? `· DNS: ${nic.dns}` : ''}
+                      </div>
+                    ` : ''}
+
+                    <button class="nw-btn visitor-select-nic-btn ${isSelected ? 'active' : ''}" data-nic="${nic.name}" style="margin-top: 4px; width: 100%; padding: 3px 6px; font-size: 10px; font-weight: 700; text-align: center; ${isSelected ? 'background: var(--brand); color: #000; border-color: var(--brand);' : ''}">
+                      ${isSelected ? '✓ Active Monitored Visitor NIC' : 'Select as Monitored NIC'}
+                    </button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+
+        // Bind selection buttons
+        picker.querySelectorAll('.visitor-select-nic-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const chosen = btn.dataset.nic;
+            visitorNicScanner.setActiveNic(chosen);
+            const newlySelected = adapters.find(a => a.name === chosen) || activeNic;
+            scan.activeNic = newlySelected;
+            this.renderVisitorNicsSection(scan);
+
+            fetch('/api/interfaces/select', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ iface: chosen, isVisitor: true })
+            }).catch(() => {});
+          });
+        });
+      }
+    } else {
+      this.updateCheckItem('initial-nics', 'warn', 'No network interfaces detected on visitor machine.');
+    }
+  }
+
   renderInitial() {
     this.container.innerHTML = `
       <div class="nw-doctor-card">
@@ -182,10 +240,10 @@ export class DoctorScreen {
             <div style="font-size: 28px;">🩺</div>
             <div>
               <h2 style="font-family: var(--font-sans); font-size: 18px; color: var(--brand); letter-spacing: 0.5px;">
-                NETWATCH DOCTOR & ONLINE PRE-FLIGHT VERIFICATION
+                NETWATCH DOCTOR &amp; PRE-FLIGHT VERIFICATION
               </h2>
               <div style="font-size: 11px; color: var(--text-muted);">
-                Verifying host applications, OS socket attribution, packet drivers, and cloud telemetry
+                Verifying visitor PC network cards, OS socket attribution, packet drivers, and telemetry pipeline
               </div>
             </div>
           </div>
@@ -197,7 +255,7 @@ export class DoctorScreen {
 
         <!-- Host Info Bar -->
         <div id="doctor-system-info" style="font-size: 11px; color: var(--text-muted); background: rgba(0,0,0,0.25); padding: 8px 14px; border-radius: 4px; margin-bottom: 14px; border: 1px solid var(--border-subtle);">
-          Connecting to NetWatch backend & querying system capabilities...
+          Connecting to NetWatch telemetry engine &amp; probing visitor PC network cards...
         </div>
 
         <!-- Checklist List -->
@@ -218,20 +276,27 @@ export class DoctorScreen {
             </div>
           </div>
 
-                    <div class="nw-doctor-item" id="item-initial-nics">
+          <!-- Dedicated Visitor PC Network Cards Item -->
+          <div class="nw-doctor-item" id="item-initial-nics">
             <span class="nw-doctor-status checking">●</span>
             <div style="flex: 1;">
-              <strong>Network Interface Cards (NICs) & Physical Adapters</strong>
-              <div class="detail" style="font-size: 11px; color: var(--text-muted);">Detecting host network adapters, physical NICs, and IP addresses...</div>
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+                <strong>Visitor PC Network Interface Cards (NICs) &amp; Physical Adapters</strong>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                  <button class="nw-btn" id="doctor-rescan-visitor-btn" style="padding: 2px 8px; font-size: 10px;" title="Re-scan visitor PC network adapters">🔄 Re-scan PC</button>
+                  <button class="nw-btn" id="doctor-import-ipconfig-btn" style="padding: 2px 8px; font-size: 10px; background: rgba(0, 210, 255, 0.15); border-color: var(--brand); color: var(--brand); font-weight: 700;" title="Import Windows ipconfig /all or PowerShell Get-NetAdapter">📋 Import ipconfig</button>
+                </div>
+              </div>
+              <div class="detail" style="font-size: 11px; color: var(--text-muted);">Probing visitor machine physical adapters, WebRTC host candidates, and IP addresses...</div>
               <div id="initial-nics-picker" style="display: none; margin-top: 8px;"></div>
             </div>
           </div>
 
-<div class="nw-doctor-item" id="item-client-platform">
+          <div class="nw-doctor-item" id="item-client-platform">
             <span class="nw-doctor-status checking">●</span>
             <div style="flex: 1;">
               <strong>Client Platform &amp; Device Compatibility</strong>
-              <div class="detail" style="font-size: 11px; color: var(--text-muted);">Detecting macOS / iOS WebKit engine, Retina HiDPI, and touch capabilities...</div>
+              <div class="detail" style="font-size: 11px; color: var(--text-muted);">Detecting client OS, screen resolution, and input capabilities...</div>
             </div>
           </div>
         </div>
@@ -281,10 +346,34 @@ export class DoctorScreen {
       </div>
     `;
 
-    // Re-test button
+    // Retest button
     this.container.querySelector('#doctor-retest-btn').addEventListener('click', () => {
       this.runChecks();
     });
+
+    // Re-scan visitor button
+    const rescanBtn = this.container.querySelector('#doctor-rescan-visitor-btn');
+    if (rescanBtn) {
+      rescanBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        rescanBtn.textContent = '⏳ Scanning...';
+        this.visitorScan = await visitorNicScanner.scan();
+        this.renderVisitorNicsSection(this.visitorScan);
+        rescanBtn.textContent = '✓ Updated!';
+        setTimeout(() => { rescanBtn.textContent = '🔄 Re-scan PC'; }, 2000);
+      });
+    }
+
+    // Import ipconfig button
+    const importBtn = this.container.querySelector('#doctor-import-ipconfig-btn');
+    if (importBtn) {
+      importBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.showImportIpconfigModal();
+      });
+    }
 
     // Mode options
     const optLive = this.container.querySelector('#mode-opt-live');
@@ -317,7 +406,10 @@ export class DoctorScreen {
     // View JSON button
     const jsonBtn = this.container.querySelector('#view-raw-json-btn');
     jsonBtn.addEventListener('click', () => {
-      this.showRawJsonModal(this.report || { status: 'loading' });
+      this.showRawJsonModal({
+        visitor: this.visitorScan,
+        server: this.report || { status: 'loading' }
+      });
     });
   }
 
@@ -330,7 +422,7 @@ export class DoctorScreen {
 
     if (dot) {
       dot.className = `nw-doctor-status ${status}`;
-      dot.textContent = status === 'pass' ? '✓' : '✖';
+      dot.textContent = status === 'pass' ? '✓' : (status === 'checking' ? '●' : '✖');
     }
     if (detailDiv) {
       detailDiv.textContent = detail;
@@ -380,24 +472,22 @@ export class DoctorScreen {
 
     let nicsHtml = '';
     if (cap.nics && cap.nics.length > 0) {
-      const selectedNic = localStorage.getItem('nw_selected_nic') || cap.selectedNic || cap.nics[0].name;
       nicsHtml = `
         <div class="doctor-nics-deck" style="margin-top: 10px; display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
             <strong style="font-size: 11px; color: var(--brand); letter-spacing: 0.5px;">
-              DETECTED NETWORK ADAPTERS &amp; HARDWARE NICS (${cap.nics.length})
+              DETECTED CLOUD SERVER &amp; HOST INTERFACES (${cap.nics.length})
             </strong>
-            <span style="font-size: 10px; color: var(--text-muted);">Select active interface to monitor</span>
+            <span style="font-size: 10px; color: var(--text-muted);">Backend Server Container Stack</span>
           </div>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px;">
             ${cap.nics.map(nic => {
-              const isSelected = nic.name === selectedNic;
               const isOnline = nic.isUp;
               return `
-                <div class="doctor-nic-card ${isSelected ? 'selected' : ''}" style="background: rgba(255,255,255,0.03); border: 1px solid ${isSelected ? 'var(--brand)' : 'var(--border-subtle)'}; border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; gap: 4px;">
+                <div class="doctor-nic-card" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; gap: 4px;">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="display: flex; align-items: center; gap: 6px;">
-                      <span style="font-size: 15px;">${nic.icon}</span>
+                      <span style="font-size: 15px;">${nic.icon || '🔌'}</span>
                       <div>
                         <strong style="font-size: 12px; color: var(--text-primary);">${nic.name}</strong>
                         <div style="font-size: 10px; color: var(--text-muted);">${nic.description}</div>
@@ -416,9 +506,6 @@ export class DoctorScreen {
                       <span style="color: var(--text-muted);">MAC:</span> <span>${nic.mac}</span>
                     </div>
                   </div>
-                  <button class="nw-btn doctor-select-nic-btn ${isSelected ? 'active' : ''}" data-nic-name="${nic.name}" style="margin-top: 4px; width: 100%; padding: 3px 6px; font-size: 10px; font-weight: 600; text-align: center; ${isSelected ? 'background: var(--brand); color: #000; border-color: var(--brand);' : ''}">
-                    ${isSelected ? '✓ Monitored Active NIC' : 'Select for Live Monitoring'}
-                  </button>
                 </div>
               `;
             }).join('')}
@@ -451,35 +538,126 @@ export class DoctorScreen {
       </div>
     `;
 
-    // Bind NIC selection events
-    row.querySelectorAll('.doctor-select-nic-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const nicName = btn.getAttribute('data-nic-name');
-        localStorage.setItem('nw_selected_nic', nicName);
-        try {
-          await fetch('/api/interfaces/select', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ iface: nicName })
-          });
-        } catch {
-          // ignore
-        }
-        row.querySelectorAll('.doctor-nic-card').forEach(c => c.style.borderColor = 'var(--border-subtle)');
-        btn.closest('.doctor-nic-card')?.style.setProperty('border-color', 'var(--brand)');
-        row.querySelectorAll('.doctor-select-nic-btn').forEach(b => {
-          const isThis = b.getAttribute('data-nic-name') === nicName;
-          b.className = `nw-btn doctor-select-nic-btn ${isThis ? 'active' : ''}`;
-          b.style.background = isThis ? 'var(--brand)' : '';
-          b.style.color = isThis ? '#000' : '';
-          b.style.borderColor = isThis ? 'var(--brand)' : '';
-          b.textContent = isThis ? '✓ Monitored Active NIC' : 'Select for Live Monitoring';
-        });
-      });
+    list.appendChild(row);
+  }
+
+  showImportIpconfigModal() {
+    const modal = document.createElement('div');
+    modal.className = 'nw-modal-overlay';
+    modal.innerHTML = `
+      <div class="nw-modal" style="max-width: 680px;">
+        <div class="nw-modal-header">
+          <span class="nw-panel-title">📋 Import Visitor PC Network Cards (ipconfig /all)</span>
+          <button class="nw-btn" id="close-import-modal">✖ Close</button>
+        </div>
+        <div class="nw-modal-body" style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+            Paste your Windows <code>ipconfig /all</code> or PowerShell <code>Get-NetAdapter | ConvertTo-Json</code> output below to accurately recognise all network adapters, physical MAC addresses, and IP configurations.
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 10px; color: var(--brand); font-weight: 700;">Terminal Output or Adapter JSON:</span>
+            <button class="nw-btn" id="load-fred-sample-btn" style="font-size: 10px; padding: 2px 8px; background: rgba(0, 210, 255, 0.1); border-color: var(--brand);">
+              ⚡ Insert fred-pc Sample (Realtek PCIe GBE)
+            </button>
+          </div>
+
+          <textarea id="ipconfig-input" style="width: 100%; height: 160px; font-family: var(--font-mono); font-size: 11px; background: rgba(0,0,0,0.4); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; resize: vertical;" placeholder="Paste 'ipconfig /all' output from PowerShell or Command Prompt here..."></textarea>
+
+          <div id="import-parse-status" style="font-size: 11px; color: var(--text-muted); min-height: 18px;"></div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+            <button class="nw-btn" id="cancel-import-btn">Cancel</button>
+            <button class="nw-btn active" id="apply-import-btn" style="font-weight: 700; background: var(--brand); color: #000;">
+              ✓ Parse &amp; Apply Adapters
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const closeBtn = modal.querySelector('#close-import-modal');
+    const cancelBtn = modal.querySelector('#cancel-import-btn');
+    const applyBtn = modal.querySelector('#apply-import-btn');
+    const sampleBtn = modal.querySelector('#load-fred-sample-btn');
+    const textarea = modal.querySelector('#ipconfig-input');
+    const statusDiv = modal.querySelector('#import-parse-status');
+
+    const closeModal = () => modal.remove();
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
     });
 
-    list.appendChild(row);
+    sampleBtn.addEventListener('click', () => {
+      textarea.value = `Windows IP Configuration
+
+   Host Name . . . . . . . . . : fred-pc
+   Primary Dns Suffix . . . . . : 
+   Node Type . . . . . . . . . : Hybrid
+   IP Routing Enabled. . . . . : No
+   WINS Proxy Enabled. . . . . : No
+
+Ethernet adapter Ethernet:
+
+   Connection-specific DNS Suffix . : localdomain
+   Description . . . . . . . . . . . : Realtek PCIe GBE Family Controller
+   Physical Address. . . . . . . . . : D4-5D-64-37-D3-4A
+   DHCP Enabled. . . . . . . . . . . : Yes
+   Autoconfiguration Enabled . . . . : Yes
+   IPv6 Address. . . . . . . . . . . : fd1c:35f7:d7a4:2cd9:d0d4:26c:f32e:7052(Preferred)
+   IPv4 Address. . . . . . . . . . . : 192.168.1.92(Preferred)
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Default Gateway . . . . . . . . . : 192.168.1.1
+   DNS Servers . . . . . . . . . . . : 192.168.1.1
+                                       1.1.1.1
+
+Ethernet adapter Bluetooth Network Connection:
+
+   Media State . . . . . . . . . . . : Media disconnected
+   Connection-specific DNS Suffix . : 
+   Description . . . . . . . . . . . : Bluetooth Device (Personal Area Network)
+   Physical Address. . . . . . . . . : 00-1A-7D-DA-71-15
+   DHCP Enabled. . . . . . . . . . . : Yes
+   Autoconfiguration Enabled . . . . : Yes`;
+      statusDiv.textContent = 'Sample loaded. Click "Parse & Apply Adapters".';
+      statusDiv.style.color = 'var(--brand)';
+    });
+
+    applyBtn.addEventListener('click', async () => {
+      const text = textarea.value.trim();
+      if (!text) {
+        statusDiv.textContent = 'Please paste your ipconfig or Get-NetAdapter text first.';
+        statusDiv.style.color = 'var(--status-warn)';
+        return;
+      }
+
+      const parsed = visitorNicScanner.parseIpconfig(text);
+      if (!parsed || !parsed.adapters || parsed.adapters.length === 0) {
+        statusDiv.textContent = 'Could not find any adapters in pasted text. Verify formatting.';
+        statusDiv.style.color = 'var(--status-warn)';
+        return;
+      }
+
+      visitorNicScanner.saveProfile({
+        source: 'user_imported',
+        hostName: parsed.hostName || 'fred-pc',
+        adapters: parsed.adapters
+      });
+
+      statusDiv.textContent = `✓ Successfully parsed ${parsed.adapters.length} adapter(s)! Applying...`;
+      statusDiv.style.color = 'var(--status-good)';
+
+      this.visitorScan = await visitorNicScanner.scan();
+      this.renderVisitorNicsSection(this.visitorScan);
+
+      setTimeout(() => {
+        closeModal();
+      }, 700);
+    });
   }
 
   renderCompanionTools(tools) {
