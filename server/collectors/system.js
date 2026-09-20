@@ -488,36 +488,56 @@ export class SystemCollector {
     return this.cachedConnections;
   }
 
-  async getProcessName(pid) {
-    if (!pid || pid === 0) return 'System';
-    if (this.processCache.has(pid)) return this.processCache.get(pid);
+  async refreshProcessCache() {
+    const now = Date.now();
+    if (now - (this.lastProcessRefresh || 0) < 10000) return;
+    this.lastProcessRefresh = now;
 
     try {
       if (process.platform === 'win32') {
-        const { stdout } = await execAsync(`tasklist /fi "PID eq ${pid}" /fo csv /nh`);
-        const match = stdout.split(',')[0]?.replace(/"/g, '').trim();
-        if (match && !match.toLowerCase().includes('info:')) {
-          this.processCache.set(pid, match);
-          return match;
+        const { stdout } = await execAsync('tasklist /fo csv /nh');
+        for (const line of stdout.split('\n')) {
+          const parts = line.split(',');
+          if (parts.length >= 2) {
+            const name = parts[0].replace(/"/g, '').trim();
+            const pid = parseInt(parts[1].replace(/"/g, '').trim(), 10);
+            if (pid && name && !name.toLowerCase().includes('info:')) {
+              this.processCache.set(pid, name);
+            }
+          }
         }
       } else if (process.platform === 'darwin') {
-        const { stdout } = await execAsync(`ps -p ${pid} -c -o comm= 2>/dev/null`);
-        const match = stdout.trim();
-        if (match) {
-          this.processCache.set(pid, match);
-          return match;
+        const { stdout } = await execAsync('ps -A -c -o pid=,comm= 2>/dev/null');
+        for (const line of stdout.split('\n')) {
+          const parts = line.trim().split(/\s+/);
+          if (parts.length >= 2) {
+            const pid = parseInt(parts[0], 10);
+            const name = parts.slice(1).join(' ');
+            if (pid && name) this.processCache.set(pid, name);
+          }
         }
       } else {
-        const { stdout } = await execAsync(`ps -p ${pid} -o comm= 2>/dev/null || cat /proc/${pid}/comm 2>/dev/null`);
-        const match = stdout.trim();
-        if (match) {
-          this.processCache.set(pid, match);
-          return match;
+        const { stdout } = await execAsync('ps -A -o pid=,comm= 2>/dev/null');
+        for (const line of stdout.split('\n')) {
+          const parts = line.trim().split(/\s+/);
+          if (parts.length >= 2) {
+            const pid = parseInt(parts[0], 10);
+            const name = parts.slice(1).join(' ');
+            if (pid && name) this.processCache.set(pid, name);
+          }
         }
       }
     } catch {
       // ignore
     }
+  }
+
+  async getProcessName(pid) {
+    if (!pid || pid === 0) return 'System';
+    if (this.processCache.has(pid)) return this.processCache.get(pid);
+
+    await this.refreshProcessCache();
+    if (this.processCache.has(pid)) return this.processCache.get(pid);
 
     const fallback = `proc_${pid}`;
     this.processCache.set(pid, fallback);
