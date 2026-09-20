@@ -73,72 +73,85 @@ class NetWatchApp {
     app.innerHTML = `
       <!-- Header -->
       <header class="nw-header">
-        <div class="nw-brand">
-          <div class="nw-logo">
-            <span>🛡️ NETWATCH</span>
-            <span class="nw-version">v0.30</span>
+        <div class="nw-header-left">
+          <div class="nw-brand">
+            <div class="nw-logo">
+              <span class="nw-logo-icon">🛡️</span>
+              <span class="nw-logo-text">NETWATCH</span>
+            </div>
+            <span class="nw-version-tag">v0.30</span>
           </div>
 
-          <div id="mode-pill" class="nw-banner-pill">
-            <span class="nw-pulse-dot"></span>
-            <span id="mode-label">LIVE HOST TELEMETRY</span>
+          <div class="nw-header-separator"></div>
+
+          <div id="mode-pill" class="nw-status-pill live">
+            <span class="nw-status-dot"></span>
+            <span id="mode-label" class="nw-status-text">LIVE HOST</span>
+          </div>
+
+          <!-- NIC Selector (Visible when > 1 interface exists) -->
+          <div id="nic-selector-container" class="nw-nic-container" style="display: none;">
+            <span class="nw-nic-icon">🔌</span>
+            <span class="nw-nic-prefix">NIC:</span>
+            <select id="nic-select" class="nw-header-select nw-nic-select" title="Select Network Card to monitor">
+            </select>
           </div>
         </div>
 
-        <div class="nw-header-controls">
-          <!-- NIC Selector (Visible when > 1 interface exists) -->
-          <div id="nic-selector-container" style="display: none; align-items: center; gap: 6px; flex-shrink: 0;">
-            <div style="display: flex; align-items: center; gap: 4px; background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 8px; font-size: 11px;">
-              <span style="color: var(--brand); font-weight: 700;">🔌 NIC:</span>
-              <select id="nic-select" class="nw-select" style="padding: 2px 4px; font-size: 11px; font-weight: 600; border: none; background: var(--bg-panel-solid); cursor: pointer; color: var(--text-primary); color-scheme: dark; max-width: 175px; text-overflow: ellipsis;" title="Select Network Card to monitor">
-              </select>
-            </div>
-          </div>
-
+        <div class="nw-header-right">
           <!-- Live / Demo Switcher -->
-          <button id="toggle-mode-btn" class="nw-btn" title="Toggle Live Host vs Scenario Replay [D]">
-            <span class="btn-text-full">🔄 Switch to Demo Scenario [D]</span>
-            <span class="btn-text-short">🔄 Demo [D]</span>
+          <button id="toggle-mode-btn" class="nw-header-btn nw-mode-btn" title="Toggle Live Host vs Scenario Replay [D]">
+            <span class="nw-btn-icon">🔄</span>
+            <span class="nw-btn-text">Demo Scenario</span>
+            <kbd class="nw-kbd">D</kbd>
           </button>
 
-          <!-- View Mode Selector -->
-          <div class="nw-view-group" style="display: flex; gap: 2px; background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px; flex-shrink: 0;">
-            <button class="nw-btn active" id="view-btn-full" data-view="full" title="Full 10-Tab View">
-              <span class="btn-text-full">Full [V]</span>
-              <span class="btn-text-short">Full</span>
+          <!-- View Mode Selector (Segmented Control) -->
+          <div class="nw-segmented-control" role="radiogroup" aria-label="Layout View">
+            <button class="nw-segment-btn active" id="view-btn-full" data-view="full" title="Full 10-Tab View [V]">
+              <span>Full</span>
+              <kbd class="nw-kbd">V</kbd>
             </button>
-            <button class="nw-btn" id="view-btn-dense" data-view="dense" title="Dense 4-Box Layout">Dense</button>
-            <button class="nw-btn" id="view-btn-lite" data-view="lite" title="Lite 80x24 Terminal">Lite</button>
+            <button class="nw-segment-btn" id="view-btn-dense" data-view="dense" title="Dense 4-Box Layout">
+              <span>Dense</span>
+            </button>
+            <button class="nw-segment-btn" id="view-btn-lite" data-view="lite" title="Lite Terminal Layout">
+              <span>Lite</span>
+            </button>
           </div>
 
           <!-- Theme Picker -->
-          <select id="theme-select" class="nw-select" title="Switch Theme [T]" style="max-width: 130px;">
-            <option value="dark">Theme: Dark</option>
-            <option value="dracula">Theme: Dracula</option>
-            <option value="nord">Theme: Nord</option>
-            <option value="ocean">Theme: Ocean</option>
-            <option value="solarized">Theme: Solarized</option>
-            <option value="sky">Theme: Sky</option>
-            <option value="paper">Theme: Paper (Light)</option>
-            <option value="terminal">Theme: Terminal ANSI</option>
-          </select>
+          <div class="nw-theme-wrapper" title="Switch Theme [T]">
+            <span class="nw-theme-icon">🎨</span>
+            <select id="theme-select" class="nw-header-select nw-theme-select">
+              <option value="dark">Dark</option>
+              <option value="dracula">Dracula</option>
+              <option value="nord">Nord</option>
+              <option value="ocean">Ocean</option>
+              <option value="solarized">Solarized</option>
+              <option value="sky">Sky</option>
+              <option value="paper">Paper</option>
+              <option value="terminal">Terminal</option>
+            </select>
+          </div>
 
           <!-- Pause / Resume -->
-          <button id="pause-btn" class="nw-btn" title="Pause / Resume Live Telemetry [P]">
-            <span class="btn-text-full">⏸️ Pause [P]</span>
-            <span class="btn-text-short">⏸️ Pause</span>
+          <button id="pause-btn" class="nw-header-btn nw-pause-btn" title="Pause / Resume Live Telemetry [P]">
+            <span class="nw-btn-icon">⏸️</span>
+            <span class="nw-btn-text">Pause</span>
+            <kbd class="nw-kbd">P</kbd>
           </button>
 
           <!-- Doctor Pre-flight Button -->
-          <button id="doctor-btn" class="nw-btn" title="Run NetWatch Doctor Capability Check">
-            <span class="btn-text-full">🩺 Doctor</span>
-            <span class="btn-text-short">🩺</span>
+          <button id="doctor-btn" class="nw-header-btn nw-doctor-btn" title="Run NetWatch Doctor Capability Check">
+            <span class="nw-btn-icon">🩺</span>
+            <span class="nw-btn-text">Doctor</span>
           </button>
 
           <!-- Help Keybindings Button -->
-          <button id="help-btn" class="nw-btn" title="Help & Keybindings [?]">
-            <span class="btn-text-full">❓ [?]</span>
-            <span class="btn-text-short">❓</span>
+          <button id="help-btn" class="nw-header-btn nw-help-btn" title="Help & Keybindings [?]">
+            <span class="nw-btn-icon">❓</span>
+            <kbd class="nw-kbd">?</kbd>
           </button>
         </div>
       </header>
@@ -503,25 +516,33 @@ class NetWatchApp {
 
     if (data.mode === 'live') {
       if (modePill) {
-        modePill.className = 'nw-banner-pill';
-        modeLabel.textContent = 'LIVE HOST TELEMETRY';
+        modePill.className = 'nw-status-pill live';
+        modeLabel.textContent = 'LIVE HOST';
       }
-      if (toggleBtn) toggleBtn.innerHTML = '🔄 Switch to Demo Scenario [D]';
+      if (toggleBtn) {
+        toggleBtn.innerHTML = '<span class="nw-btn-icon">🔄</span><span class="nw-btn-text">Demo Scenario</span><kbd class="nw-kbd">D</kbd>';
+        toggleBtn.title = 'Switch to Demo Scenario [D]';
+      }
     } else {
       if (modePill) {
-        modePill.className = 'nw-banner-pill demo';
-        modeLabel.textContent = 'DEMO SCENARIO (NetWatch 0.30 Arc)';
+        modePill.className = 'nw-status-pill demo';
+        modeLabel.textContent = 'DEMO SCENARIO';
       }
-      if (toggleBtn) toggleBtn.innerHTML = '🔄 Switch to Live Host [D]';
+      if (toggleBtn) {
+        toggleBtn.innerHTML = '<span class="nw-btn-icon">⚡</span><span class="nw-btn-text">Live Host</span><kbd class="nw-kbd">D</kbd>';
+        toggleBtn.title = 'Switch to Live Host [D]';
+      }
     }
 
     if (pauseBtn) {
       if (data.isPaused) {
-        pauseBtn.innerHTML = '▶️ Resume [P]';
-        pauseBtn.classList.add('active');
+        pauseBtn.innerHTML = '<span class="nw-btn-icon">▶️</span><span class="nw-btn-text">Resume</span><kbd class="nw-kbd">P</kbd>';
+        pauseBtn.classList.add('paused');
+        pauseBtn.title = 'Resume Telemetry [P]';
       } else {
-        pauseBtn.innerHTML = '⏸️ Pause [P]';
-        pauseBtn.classList.remove('active');
+        pauseBtn.innerHTML = '<span class="nw-btn-icon">⏸️</span><span class="nw-btn-text">Pause</span><kbd class="nw-kbd">P</kbd>';
+        pauseBtn.classList.remove('paused');
+        pauseBtn.title = 'Pause Telemetry [P]';
       }
     }
 
