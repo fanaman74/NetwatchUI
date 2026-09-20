@@ -106,8 +106,11 @@ export class UnifiService {
 
     // Auto-normalize controller URL
     let rawUrl = (cfg.controllerUrl || '').trim();
-    rawUrl = rawUrl.replace(/^https?:\s*\/+/, 'https://');
-    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+    if (/^http:\s*\/+/i.test(rawUrl)) {
+      rawUrl = rawUrl.replace(/^http:\s*\/+/i, 'http://');
+    } else if (/^https:\s*\/+/i.test(rawUrl)) {
+      rawUrl = rawUrl.replace(/^https:\s*\/+/i, 'https://');
+    } else if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
       rawUrl = 'https://' + rawUrl;
     }
     rawUrl = rawUrl.replace(/\/+$/, '');
@@ -212,8 +215,11 @@ export class UnifiService {
 
   async configure(newConfig) {
     let rawUrl = (newConfig.controllerUrl || '').trim();
-    rawUrl = rawUrl.replace(/^https?:\s*\/+/, 'https://');
-    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+    if (/^http:\s*\/+/i.test(rawUrl)) {
+      rawUrl = rawUrl.replace(/^http:\s*\/+/i, 'http://');
+    } else if (/^https:\s*\/+/i.test(rawUrl)) {
+      rawUrl = rawUrl.replace(/^https:\s*\/+/i, 'https://');
+    } else if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
       rawUrl = 'https://' + rawUrl;
     }
     rawUrl = rawUrl.replace(/\/+$/, '');

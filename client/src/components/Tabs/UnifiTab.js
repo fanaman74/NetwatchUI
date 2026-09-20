@@ -384,8 +384,11 @@ export class UnifiTab {
     let url = this.container.querySelector('#cfg-unifi-url').value.trim();
     
     // Auto-normalize URL (e.g. "https: /192.168.1.1", "192.168.1.1", trailing slashes)
-    url = url.replace(/^https?:\s*\/+/, 'https://');
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    if (/^http:\s*\/+/i.test(url)) {
+      url = url.replace(/^http:\s*\/+/i, 'http://');
+    } else if (/^https:\s*\/+/i.test(url)) {
+      url = url.replace(/^https:\s*\/+/i, 'https://');
+    } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
     url = url.replace(/\/+$/, '');
@@ -447,8 +450,11 @@ export class UnifiTab {
     let url = this.container.querySelector('#cfg-unifi-url').value.trim();
 
     // Auto-normalize URL (e.g. "https: /192.168.1.1", "192.168.1.1", trailing slashes)
-    url = url.replace(/^https?:\s*\/+/, 'https://');
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    if (/^http:\s*\/+/i.test(url)) {
+      url = url.replace(/^http:\s*\/+/i, 'http://');
+    } else if (/^https:\s*\/+/i.test(url)) {
+      url = url.replace(/^https:\s*\/+/i, 'https://');
+    } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
     url = url.replace(/\/+$/, '');

@@ -722,13 +722,41 @@ app.get('/api/unifi/status', (req, res) => {
 });
 
 app.post('/api/unifi/test', async (req, res) => {
-  const result = await unifiService.testConnection(req.body);
-  res.json(result);
+  console.log('[UniFi API] Received /api/unifi/test request:', {
+    controllerUrl: req.body?.controllerUrl,
+    authType: req.body?.authType,
+    username: req.body?.username,
+    hasPassword: !!req.body?.password,
+    site: req.body?.site,
+    strictSsl: req.body?.strictSsl
+  });
+  try {
+    const result = await unifiService.testConnection(req.body);
+    console.log('[UniFi API] testConnection result:', result);
+    res.json(result);
+  } catch (err) {
+    console.error('[UniFi API] testConnection threw error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.post('/api/unifi/config', async (req, res) => {
-  const result = await unifiService.configure(req.body);
-  res.json(result);
+  console.log('[UniFi API] Received /api/unifi/config request:', {
+    controllerUrl: req.body?.controllerUrl,
+    authType: req.body?.authType,
+    username: req.body?.username,
+    hasPassword: !!req.body?.password,
+    site: req.body?.site,
+    strictSsl: req.body?.strictSsl
+  });
+  try {
+    const result = await unifiService.configure(req.body);
+    console.log('[UniFi API] configure result:', result);
+    res.json(result);
+  } catch (err) {
+    console.error('[UniFi API] configure threw error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.get('/api/unifi/health', async (req, res) => {
