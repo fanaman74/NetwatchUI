@@ -104,6 +104,15 @@ export class UnifiService {
       return { success: false, error: 'Controller URL is required (e.g. https://192.168.1.1)' };
     }
 
+    // Auto-normalize controller URL
+    let rawUrl = (cfg.controllerUrl || '').trim();
+    rawUrl = rawUrl.replace(/^https?:\s*\/+/, 'https://');
+    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+      rawUrl = 'https://' + rawUrl;
+    }
+    rawUrl = rawUrl.replace(/\/+$/, '');
+    cfg.controllerUrl = rawUrl;
+
     try {
       const url = new URL(cfg.controllerUrl);
       if (url.protocol !== 'http:' && url.protocol !== 'https:') {
@@ -202,6 +211,14 @@ export class UnifiService {
   }
 
   async configure(newConfig) {
+    let rawUrl = (newConfig.controllerUrl || '').trim();
+    rawUrl = rawUrl.replace(/^https?:\s*\/+/, 'https://');
+    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+      rawUrl = 'https://' + rawUrl;
+    }
+    rawUrl = rawUrl.replace(/\/+$/, '');
+    newConfig.controllerUrl = rawUrl;
+
     const test = await this.testConnection(newConfig);
     if (!test.success) {
       return test;

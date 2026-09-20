@@ -28,10 +28,19 @@ app.use((err, req, res, next) => {
 
 // Process crash guards for server resilience
 process.on('uncaughtException', (err) => {
-  console.error('[Process] Uncaught exception guarded:', err.message);
+  console.error('[Process] Uncaught exception guarded:', err.stack || err.message);
 });
 process.on('unhandledRejection', (reason) => {
   console.warn('[Process] Unhandled rejection guarded:', reason);
+});
+process.on('exit', (code) => {
+  console.log('[Process] Node exit event fired with code:', code);
+});
+process.on('SIGINT', () => {
+  console.log('[Process] Received SIGINT signal');
+});
+process.on('SIGTERM', () => {
+  console.log('[Process] Received SIGTERM signal');
 });
 
 const httpServer = createServer(app);

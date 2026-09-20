@@ -322,6 +322,12 @@ export class UnifiTab {
     if (configBtn) configBtn.addEventListener('click', () => this.openConfigModal());
     if (closeBtn) closeBtn.addEventListener('click', () => this.closeConfigModal());
     if (cancelBtn) cancelBtn.addEventListener('click', () => this.closeConfigModal());
+    const modalElem = this.container.querySelector('#unifi-config-modal');
+    if (modalElem) {
+      modalElem.addEventListener('click', (e) => {
+        if (e.target === modalElem) this.closeConfigModal();
+      });
+    }
 
     // Auth Type Radio Toggle
     const authRadios = this.container.querySelectorAll('input[name="unifi-auth-type"]');
@@ -367,7 +373,7 @@ export class UnifiTab {
     const saveBtn = this.container.querySelector('#cfg-unifi-save-btn');
     if (saveBtn) {
       saveBtn.addEventListener('click', async () => {
-        await this.saveConfiguration(closeModal);
+        await this.saveConfiguration();
       });
     }
   }
@@ -375,7 +381,16 @@ export class UnifiTab {
   async runConnectionTest() {
     const testBtn = this.container.querySelector('#cfg-unifi-test-btn');
     const resultBox = this.container.querySelector('#cfg-unifi-test-result');
-    const url = this.container.querySelector('#cfg-unifi-url').value.trim();
+    let url = this.container.querySelector('#cfg-unifi-url').value.trim();
+    
+    // Auto-normalize URL (e.g. "https: /192.168.1.1", "192.168.1.1", trailing slashes)
+    url = url.replace(/^https?:\s*\/+/, 'https://');
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+    url = url.replace(/\/+$/, '');
+    this.container.querySelector('#cfg-unifi-url').value = url;
+
     const authType = this.container.querySelector('input[name="unifi-auth-type"]:checked').value;
     const apiKey = this.container.querySelector('#cfg-unifi-apikey').value.trim();
     const username = this.container.querySelector('#cfg-unifi-username').value.trim();
@@ -426,10 +441,19 @@ export class UnifiTab {
     }
   }
 
-  async saveConfiguration(closeCallback) {
+  async saveConfiguration() {
     const saveBtn = this.container.querySelector('#cfg-unifi-save-btn');
     const resultBox = this.container.querySelector('#cfg-unifi-test-result');
-    const url = this.container.querySelector('#cfg-unifi-url').value.trim();
+    let url = this.container.querySelector('#cfg-unifi-url').value.trim();
+
+    // Auto-normalize URL (e.g. "https: /192.168.1.1", "192.168.1.1", trailing slashes)
+    url = url.replace(/^https?:\s*\/+/, 'https://');
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+    url = url.replace(/\/+$/, '');
+    this.container.querySelector('#cfg-unifi-url').value = url;
+
     const authType = this.container.querySelector('input[name="unifi-auth-type"]:checked').value;
     const apiKey = this.container.querySelector('#cfg-unifi-apikey').value.trim();
     const username = this.container.querySelector('#cfg-unifi-username').value.trim();
@@ -437,7 +461,7 @@ export class UnifiTab {
     const site = this.container.querySelector('#cfg-unifi-site').value.trim() || 'default';
     const strictSsl = !this.container.querySelector('#cfg-unifi-selfsigned').checked;
 
-    saveBtn.innerHTML = '<span>Connecting...</span>';
+    saveBtn.innerHTML = '<span>⏳ Connecting...</span>';
     saveBtn.disabled = true;
 
     try {
@@ -457,7 +481,7 @@ export class UnifiTab {
       const data = await res.json();
 
       if (data.success) {
-        closeCallback();
+        this.closeConfigModal();
         await this.loadData();
       } else {
         resultBox.style.display = 'block';
@@ -468,6 +492,9 @@ export class UnifiTab {
       }
     } catch (err) {
       resultBox.style.display = 'block';
+      resultBox.style.background = 'rgba(248, 81, 73, 0.15)';
+      resultBox.style.border = '1px solid var(--status-error)';
+      resultBox.style.color = 'var(--status-error)';
       resultBox.innerHTML = `❌ <strong>Network Error</strong>: ${err.message}`;
     } finally {
       saveBtn.innerHTML = 'Save & Connect';
