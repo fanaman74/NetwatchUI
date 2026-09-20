@@ -9,6 +9,8 @@ export class UnifiTab {
     this.health = null;
     this.devices = [];
     this.clients = [];
+    this.networks = [];
+    this.wlans = [];
     this.isSyncing = false;
 
     this.renderInitial();
@@ -121,7 +123,8 @@ export class UnifiTab {
               <span id="unifi-subtab-dev-count" class="nw-badge-count" style="display: inline-block; margin-left: 4px;">5</span>
             </button>
             <button class="nw-segment-btn" id="unifi-tab-btn-health" data-subtab="health">
-              <span>📡 Wi-Fi Radios & Health</span>
+              <span>📡 Subnets, SSIDs &amp; Health</span>
+              <span id="unifi-subtab-health-count" class="nw-badge-count" style="display: inline-block; margin-left: 4px;">-</span>
             </button>
           </div>
 
@@ -572,17 +575,21 @@ export class UnifiTab {
   async loadData() {
     this.isSyncing = true;
     try {
-      const [statusRes, healthRes, devicesRes, clientsRes] = await Promise.all([
-        fetch('/api/unifi/status').then(r => r.json()),
-        fetch('/api/unifi/health').then(r => r.json()),
-        fetch('/api/unifi/devices').then(r => r.json()),
-        fetch('/api/unifi/clients').then(r => r.json())
+      const [statusRes, healthRes, devicesRes, clientsRes, networksRes, wlansRes] = await Promise.all([
+        fetch('/api/unifi/status').then(r => r.json()).catch(() => null),
+        fetch('/api/unifi/health').then(r => r.json()).catch(() => null),
+        fetch('/api/unifi/devices').then(r => r.json()).catch(() => []),
+        fetch('/api/unifi/clients').then(r => r.json()).catch(() => []),
+        fetch('/api/unifi/networks').then(r => r.json()).catch(() => []),
+        fetch('/api/unifi/wlans').then(r => r.json()).catch(() => [])
       ]);
 
       this.status = statusRes;
       this.health = healthRes;
       this.devices = devicesRes || [];
       this.clients = clientsRes || [];
+      this.networks = networksRes || [];
+      this.wlans = wlansRes || [];
 
       this.updateHeaderAndKPIs();
       this.renderSubTabContent();
@@ -659,6 +666,12 @@ export class UnifiTab {
     if (cliChip) cliChip.textContent = `${this.clients.length} Online`;
     if (cliSub) cliSub.textContent = `${wifiClients} Wireless · ${wiredClients} Wired`;
     if (subtabCliCount) subtabCliCount.textContent = this.clients.length;
+
+    // Subnets & SSIDs Subtab badge
+    const subtabHealthCount = this.container.querySelector('#unifi-subtab-health-count');
+    if (subtabHealthCount) {
+      subtabHealthCount.textContent = `${this.networks.length} VLANs · ${this.wlans.length} SSIDs`;
+    }
 
     // WiFi Experience
     const wifiExp = this.container.querySelector('#kpi-unifi-wifi-exp');
@@ -910,63 +923,212 @@ export class UnifiTab {
     const body = this.container.querySelector('#unifi-tab-body');
     if (!body || !this.health) return;
 
+    const networks = this.networks || [];
+    const wlans = this.wlans || [];
+
     body.innerHTML = `
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;">
-        <!-- WAN Subsystem -->
-        <div class="nw-panel" style="background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
-          <div class="nw-panel-title" style="margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            <span>🌐</span> WAN Uplink &amp; Internet Health
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
-            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
-              <span style="color: var(--text-muted);">Internet Status:</span>
-              <span class="nw-chip established">Connected · Gigabit Fiber</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
-              <span style="color: var(--text-muted);">Public IP:</span>
-              <span style="font-family: var(--font-mono); color: var(--brand);">${this.health.wan?.ip || '-'}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
-              <span style="color: var(--text-muted);">ISP Latency / Ping:</span>
-              <span style="color: var(--status-good); font-weight: 600;">${this.health.wan?.latencyMs || 8} ms (0.0% packet loss)</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; padding: 6px 0;">
-              <span style="color: var(--text-muted);">Max Capacity:</span>
-              <span>↓ 940 Mbps / ↑ 915 Mbps</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- LAN Subnets -->
-        <div class="nw-panel" style="background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
-          <div class="nw-panel-title" style="margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            <span>🔌</span> Local Subnets &amp; VLANs
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
-            ${(this.health.lan?.subnets || ['192.168.1.0/24 (Default)']).map(sub => `
-              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-app); padding: 8px 10px; border-radius: 5px; border: 1px solid var(--border-subtle);">
-                <span style="font-family: var(--font-mono); color: var(--brand);">${sub}</span>
-                <span class="nw-chip established" style="font-size: 10px;">Active</span>
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <!-- Top Status Overview -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px;">
+          <!-- WAN Subsystem -->
+          <div class="nw-panel" style="background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+            <div class="nw-panel-title" style="margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span>🌐</span> WAN Uplink &amp; Internet Health
               </div>
-            `).join('')}
+              <span class="nw-chip established">Connected</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+                <span style="color: var(--text-muted);">Gateway Router:</span>
+                <span style="font-weight: 700; color: var(--text-primary);">${this.health.wan?.gateway || 'UniFi Gateway'}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+                <span style="color: var(--text-muted);">Public Uplink IP:</span>
+                <span style="font-family: var(--font-mono); color: var(--brand);">${this.health.wan?.ip || '-'}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+                <span style="color: var(--text-muted);">Ping Latency / Jitter:</span>
+                <span style="color: var(--status-good); font-weight: 600;">${this.health.wan?.latencyMs || 7.5} ms (0.0% packet loss)</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                <span style="color: var(--text-muted);">Capacity Profile:</span>
+                <span>↓ 940 Mbps / ↑ 915 Mbps (Gigabit Fiber)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Wi-Fi Experience & Radio Metrics -->
+          <div class="nw-panel" style="background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+            <div class="nw-panel-title" style="margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span>📶</span> RF Health &amp; Experience
+              </div>
+              <span class="nw-chip established">${this.health.wlan?.experienceScore || 98}% Score</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+                <span style="color: var(--text-muted);">Active SSIDs:</span>
+                <span style="font-weight: 700; color: var(--text-primary);">${wlans.length} Broadcast Networks</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+                <span style="color: var(--text-muted);">2.4 GHz Band Utilization:</span>
+                <span style="font-family: var(--font-mono); color: var(--status-good); font-weight: 600;">${this.health.wlan?.channelUtilization24 || 14.5}% (Low)</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+                <span style="color: var(--text-muted);">5 GHz Band Utilization:</span>
+                <span style="font-family: var(--font-mono); color: var(--status-good); font-weight: 600;">${this.health.wlan?.channelUtilization5 || 11.2}% (Low)</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                <span style="color: var(--text-muted);">6 GHz Band Utilization:</span>
+                <span style="font-family: var(--font-mono); color: var(--brand); font-weight: 600;">${this.health.wlan?.channelUtilization6 || 4.8}% (Optimal)</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Wireless Subsystem -->
+        <!-- Section: Configured Subnets & VLANs -->
         <div class="nw-panel" style="background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
-          <div class="nw-panel-title" style="margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            <span>📡</span> Wi-Fi Broadcast SSIDs
+          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">🔌</span>
+              <div>
+                <div style="font-weight: 700; font-size: 14px; color: var(--text-primary);">Configured Subnets &amp; VLANs</div>
+                <div style="font-size: 11px; color: var(--text-muted);">All internal IP subnets, VLAN IDs, and DHCP pools configured on the gateway router</div>
+              </div>
+            </div>
+            <span class="nw-version-tag" style="font-size: 11px;">${networks.length} Total Networks</span>
           </div>
-          <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
-            ${(this.health.wlan?.activeSsids || ['HomeLab-Net']).map(ssid => `
-              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-app); padding: 8px 10px; border-radius: 5px; border: 1px solid var(--border-subtle);">
-                <div style="display: flex; align-items: center; gap: 6px;">
-                  <span>📶</span>
-                  <strong>${ssid}</strong>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+            ${networks.map(net => {
+              const isWan = net.purpose === 'wan';
+              const purposeBadge = isWan ? 'WAN Uplink' : (net.purpose === 'guest' ? 'Guest Network' : 'Corporate LAN');
+              const purposeClass = isWan ? 'listen' : (net.purpose === 'guest' ? 'close_wait' : 'established');
+              return `
+                <div style="background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
+                  <div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                      <span style="font-weight: 700; font-size: 13.5px; color: var(--text-primary);">${net.name}</span>
+                      <span class="nw-chip ${purposeClass}" style="font-size: 9.5px;">${purposeBadge}</span>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                      <span class="nw-version-tag" style="background: rgba(0, 210, 255, 0.12); color: var(--brand); font-weight: 700;">
+                        ${net.vlanLabel || (net.vlan ? `VLAN ${net.vlan}` : 'Untagged')}
+                      </span>
+                      ${net.subnet ? `
+                        <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-primary);">
+                          ${net.subnet}
+                        </span>
+                      ` : `
+                        <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">
+                          Dynamic ISP Gateway
+                        </span>
+                      `}
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--text-secondary);">
+                      ${net.gatewayIp ? `
+                        <div style="display: flex; justify-content: space-between;">
+                          <span style="color: var(--text-muted);">Gateway IP:</span>
+                          <span style="font-family: var(--font-mono); color: var(--text-primary);">${net.gatewayIp}</span>
+                        </div>
+                      ` : ''}
+                      <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-muted);">DHCP Range:</span>
+                        <span style="font-family: var(--font-mono); color: ${net.dhcpEnabled ? 'var(--status-good)' : 'var(--text-muted)'};">
+                          ${net.dhcpRange}
+                        </span>
+                      </div>
+                      ${net.dnsServers && net.dnsServers.length > 0 ? `
+                        <div style="display: flex; justify-content: space-between;">
+                          <span style="color: var(--text-muted);">DNS Resolvers:</span>
+                          <span style="font-family: var(--font-mono);">${net.dnsServers.join(', ')}</span>
+                        </div>
+                      ` : ''}
+                    </div>
+                  </div>
+
+                  <div style="border-top: 1px solid var(--border-subtle); padding-top: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: var(--text-muted);">
+                    <span>IGMP Snooping: <strong>${net.igmpSnooping ? 'Enabled' : 'Disabled'}</strong></span>
+                    <span style="color: var(--status-good);">● Active</span>
+                  </div>
                 </div>
-                <span class="nw-version-tag">WPA3 / WPA2-Enterprise</span>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Section: Configured Wireless SSIDs -->
+        <div class="nw-panel" style="background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">📡</span>
+              <div>
+                <div style="font-weight: 700; font-size: 14px; color: var(--text-primary);">Configured Wireless Networks (SSIDs)</div>
+                <div style="font-size: 11px; color: var(--text-muted);">Wi-Fi SSIDs broadcasted across UniFi Access Points with security and VLAN mappings</div>
               </div>
-            `).join('')}
+            </div>
+            <span class="nw-version-tag" style="font-size: 11px;">${wlans.length} Active SSIDs</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+            ${wlans.map(w => {
+              return `
+                <div style="background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
+                  <div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 16px;">📶</span>
+                        <span style="font-weight: 700; font-size: 14px; color: var(--brand);">${w.name}</span>
+                      </div>
+                      ${w.hideSsid ? `
+                        <span class="nw-chip close_wait" style="font-size: 9.5px;">🔒 Hidden</span>
+                      ` : `
+                        <span class="nw-chip established" style="font-size: 9.5px;">● Broadcast</span>
+                      `}
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
+                      <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-muted);">Security Mode:</span>
+                        <span class="nw-version-tag" style="font-size: 10px; color: var(--text-primary); font-weight: 600;">
+                          ${w.security}
+                        </span>
+                      </div>
+                      <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-muted);">Network Mapping:</span>
+                        <span style="font-weight: 600; color: var(--brand);">
+                          ${w.networkName} (${w.vlanLabel || `VLAN ${w.vlan}`})
+                        </span>
+                      </div>
+                      <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-muted);">Subnet Range:</span>
+                        <span style="font-family: var(--font-mono); font-size: 10.5px;">
+                          ${w.subnet || '-'}
+                        </span>
+                      </div>
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                        <span style="color: var(--text-muted);">Radio Bands:</span>
+                        <div style="display: flex; gap: 4px;">
+                          ${w.bands.map(b => `
+                            <span class="nw-version-tag" style="font-size: 9px; padding: 1px 5px; background: rgba(255,255,255,0.06);">
+                              ${b}
+                            </span>
+                          `).join('')}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style="border-top: 1px solid var(--border-subtle); padding-top: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: var(--text-muted);">
+                    <span>Fast Roaming: <strong style="color: ${w.fastRoaming ? 'var(--status-good)' : 'var(--text-muted)'};">${w.fastRoaming ? '802.11r Enabled' : 'Disabled'}</strong></span>
+                    <span>Client Isolation: <strong>${w.clientIsolation ? 'Enabled' : 'Off'}</strong></span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
           </div>
         </div>
       </div>

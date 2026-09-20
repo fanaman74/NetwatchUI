@@ -774,6 +774,24 @@ app.get('/api/unifi/clients', async (req, res) => {
   res.json(clients);
 });
 
+app.get('/api/unifi/networks', async (req, res) => {
+  try {
+    const networks = await unifiService.getNetworks();
+    res.json(networks);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/unifi/wlans', async (req, res) => {
+  try {
+    const wlans = await unifiService.getWlans();
+    res.json(wlans);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/unifi/demo', (req, res) => {
   const status = unifiService.enableDemoMode();
   res.json({ success: true, message: 'Demo UniFi network loaded successfully!', status });
