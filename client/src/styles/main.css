@@ -117,7 +117,19 @@ body {
 .nw-header-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.btn-text-full {
+  display: inline;
+  white-space: nowrap;
+}
+
+.btn-text-short {
+  display: none;
+  white-space: nowrap;
 }
 
 .nw-btn {
@@ -132,6 +144,8 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all var(--transition-fast);
 }
 
@@ -1014,18 +1028,73 @@ body {
   display: none;
 }
 
-/* 3. Responsive Breakpoints for iPad / iPhone / Mobile Safari */
-@media (max-width: 900px) {
+/* 3. Comprehensive Responsive Breakpoints */
+
+@media (max-width: 1400px) {
+  .btn-text-full {
+    display: none !important;
+  }
+  .btn-text-short {
+    display: inline !important;
+  }
+  .nw-header-controls {
+    gap: 6px;
+  }
+  #nic-select {
+    max-width: 155px !important;
+  }
+}
+
+@media (max-width: 1150px) {
   .nw-header {
     flex-wrap: wrap;
+    row-gap: 8px;
+    padding: 8px 14px;
+    padding-top: max(8px, env(safe-area-inset-top, 8px));
+  }
+  .nw-header-controls {
+    gap: 5px;
+  }
+  .nw-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  .nw-banner-pill {
+    padding: 2px 8px;
+    font-size: 10px;
+  }
+  #nic-select {
+    max-width: 135px !important;
+  }
+  .nw-kpi-strip {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .nw-header {
+    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
     padding: 10px 14px;
     padding-top: max(10px, env(safe-area-inset-top, 10px));
   }
-  
+
+  .nw-brand {
+    justify-content: space-between;
+    width: 100%;
+  }
+
   .nw-header-controls {
-    flex-wrap: wrap;
-    gap: 6px;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .nw-header-controls::-webkit-scrollbar {
+    display: none;
   }
 
   .nw-main {
@@ -1053,6 +1122,11 @@ body {
   #companion-tools-grid {
     grid-template-columns: 1fr !important;
   }
+
+  #visitor-interfaces-grid,
+  #interfaces-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 @media (max-width: 600px) {
@@ -1074,14 +1148,16 @@ body {
   }
 
   .nw-btn {
-    min-height: 40px; /* Touch-friendly tap target size on iOS (HIG standard) */
-    padding: 6px 12px;
+    min-height: 38px;
+    padding: 6px 10px;
+    font-size: 11px;
   }
 
   .nw-tab {
-    padding: 8px 14px;
-    font-size: 13px;
-    min-height: 42px;
+    padding: 8px 12px;
+    font-size: 12px;
+    min-height: 40px;
+    flex-shrink: 0;
   }
 
   .nw-footer-hints {
@@ -1099,6 +1175,12 @@ body {
     border-radius: var(--radius-sm);
     padding: 4px 8px;
     margin-bottom: 8px;
+  }
+
+  .nw-modal {
+    width: 96vw !important;
+    max-width: 96vw !important;
+    margin: 8px !important;
   }
 
   /* Stacking modal grid on phones */

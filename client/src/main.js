@@ -87,28 +87,32 @@ class NetWatchApp {
 
         <div class="nw-header-controls">
           <!-- NIC Selector (Visible when > 1 interface exists) -->
-          <div id="nic-selector-container" style="display: none; align-items: center; gap: 6px;">
-            <div style="display: flex; align-items: center; gap: 6px; background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 8px; font-size: 11px;">
+          <div id="nic-selector-container" style="display: none; align-items: center; gap: 6px; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 4px; background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 8px; font-size: 11px;">
               <span style="color: var(--brand); font-weight: 700;">🔌 NIC:</span>
-              <select id="nic-select" class="nw-select" style="padding: 2px 6px; font-size: 11px; font-weight: 600; border: none; background: var(--bg-panel-solid); cursor: pointer; color: var(--text-primary); color-scheme: dark;" title="Select Network Card to monitor">
+              <select id="nic-select" class="nw-select" style="padding: 2px 4px; font-size: 11px; font-weight: 600; border: none; background: var(--bg-panel-solid); cursor: pointer; color: var(--text-primary); color-scheme: dark; max-width: 175px; text-overflow: ellipsis;" title="Select Network Card to monitor">
               </select>
             </div>
           </div>
 
           <!-- Live / Demo Switcher -->
           <button id="toggle-mode-btn" class="nw-btn" title="Toggle Live Host vs Scenario Replay [D]">
-            🔄 Switch to Demo Scenario [D]
+            <span class="btn-text-full">🔄 Switch to Demo Scenario [D]</span>
+            <span class="btn-text-short">🔄 Demo [D]</span>
           </button>
 
           <!-- View Mode Selector -->
-          <div style="display: flex; gap: 2px; background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px;">
-            <button class="nw-btn active" id="view-btn-full" data-view="full" title="Full 10-Tab View">Full [V]</button>
+          <div class="nw-view-group" style="display: flex; gap: 2px; background: var(--bg-panel-solid); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px; flex-shrink: 0;">
+            <button class="nw-btn active" id="view-btn-full" data-view="full" title="Full 10-Tab View">
+              <span class="btn-text-full">Full [V]</span>
+              <span class="btn-text-short">Full</span>
+            </button>
             <button class="nw-btn" id="view-btn-dense" data-view="dense" title="Dense 4-Box Layout">Dense</button>
             <button class="nw-btn" id="view-btn-lite" data-view="lite" title="Lite 80x24 Terminal">Lite</button>
           </div>
 
           <!-- Theme Picker -->
-          <select id="theme-select" class="nw-select" title="Switch Theme [T]">
+          <select id="theme-select" class="nw-select" title="Switch Theme [T]" style="max-width: 130px;">
             <option value="dark">Theme: Dark</option>
             <option value="dracula">Theme: Dracula</option>
             <option value="nord">Theme: Nord</option>
@@ -121,17 +125,20 @@ class NetWatchApp {
 
           <!-- Pause / Resume -->
           <button id="pause-btn" class="nw-btn" title="Pause / Resume Live Telemetry [P]">
-            ⏸️ Pause [P]
+            <span class="btn-text-full">⏸️ Pause [P]</span>
+            <span class="btn-text-short">⏸️ Pause</span>
           </button>
 
           <!-- Doctor Pre-flight Button -->
           <button id="doctor-btn" class="nw-btn" title="Run NetWatch Doctor Capability Check">
-            🩺 Doctor
+            <span class="btn-text-full">🩺 Doctor</span>
+            <span class="btn-text-short">🩺</span>
           </button>
 
           <!-- Help Keybindings Button -->
           <button id="help-btn" class="nw-btn" title="Help & Keybindings [?]">
-            ❓ [?]
+            <span class="btn-text-full">❓ [?]</span>
+            <span class="btn-text-short">❓</span>
           </button>
         </div>
       </header>
