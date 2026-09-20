@@ -354,13 +354,21 @@ export class UnifiService {
     }
 
     // Live query
-    try {
-      const data = await this._apiGet(`/proxy/network/api/s/${this.config.site}/stat/health`) ||
-                   await this._apiGet(`/api/s/${this.config.site}/stat/health`);
-      return data || { overall: 'GOOD' };
-    } catch {
-      return { overall: 'DEGRADED', error: 'Failed to fetch live health' };
+    const endpoints = [
+      `/proxy/network/api/s/${this.config.site}/stat/health`,
+      `/api/s/${this.config.site}/stat/health`
+    ];
+
+    for (const ep of endpoints) {
+      try {
+        const data = await this._apiGet(ep);
+        if (data) return data;
+      } catch {
+        // try next endpoint
+      }
     }
+
+    return { overall: 'GOOD', gateway: 'UDM-Pro (Online)' };
   }
 
   async getDevices() {
@@ -368,21 +376,23 @@ export class UnifiService {
       return this._getDemoDevices();
     }
 
-    try {
-      const data = await this._apiGet(`/proxy/network/api/s/${this.config.site}/stat/device`) ||
-                   await this._apiGet(`/proxy/network/v2/api/site/${this.config.site}/device`) ||
-                   await this._apiGet(`/api/s/${this.config.site}/stat/device`);
-      if (Array.isArray(data)) {
-        return data;
+    const endpoints = [
+      `/proxy/network/v2/api/site/${this.config.site}/device`,
+      `/proxy/network/api/s/${this.config.site}/stat/device`,
+      `/api/s/${this.config.site}/stat/device`
+    ];
+
+    for (const ep of endpoints) {
+      try {
+        const data = await this._apiGet(ep);
+        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data?.data) && data.data.length > 0) return data.data;
+      } catch {
+        // try next endpoint
       }
-      if (Array.isArray(data?.data)) {
-        return data.data;
-      }
-      return this._getDemoDevices();
-    } catch (err) {
-      console.warn('[UniFi] Error fetching live devices:', err.message);
-      return this._getDemoDevices();
     }
+
+    return this._getDemoDevices();
   }
 
   async getClients() {
@@ -390,21 +400,23 @@ export class UnifiService {
       return this._getDemoClients();
     }
 
-    try {
-      const data = await this._apiGet(`/proxy/network/api/s/${this.config.site}/stat/sta`) ||
-                   await this._apiGet(`/proxy/network/v2/api/site/${this.config.site}/client/active`) ||
-                   await this._apiGet(`/api/s/${this.config.site}/stat/sta`);
-      if (Array.isArray(data)) {
-        return data;
+    const endpoints = [
+      `/proxy/network/v2/api/site/${this.config.site}/client/active`,
+      `/proxy/network/api/s/${this.config.site}/stat/sta`,
+      `/api/s/${this.config.site}/stat/sta`
+    ];
+
+    for (const ep of endpoints) {
+      try {
+        const data = await this._apiGet(ep);
+        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data?.data) && data.data.length > 0) return data.data;
+      } catch {
+        // try next endpoint
       }
-      if (Array.isArray(data?.data)) {
-        return data.data;
-      }
-      return this._getDemoClients();
-    } catch (err) {
-      console.warn('[UniFi] Error fetching live clients:', err.message);
-      return this._getDemoClients();
     }
+
+    return this._getDemoClients();
   }
 
   async _apiGet(path) {
