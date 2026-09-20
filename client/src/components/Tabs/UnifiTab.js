@@ -36,10 +36,24 @@ export class UnifiTab {
             <button id="unifi-demo-btn" class="nw-header-btn" title="Load Demo Network">
               <span>🧪 Demo Lab</span>
             </button>
-            <button id="unifi-config-btn" class="nw-header-btn active" title="Configure Controller URL & API Key">
+            <button id="unifi-config-btn" class="nw-header-btn active" title="Configure Controller URL & API Key" style="background: var(--brand); color: var(--text-inverse); font-weight: 700;">
               <span>⚙️ Configure API</span>
             </button>
           </div>
+        </div>
+
+        <!-- Live Connect Callout Banner -->
+        <div class="nw-unifi-connect-banner" style="background: linear-gradient(90deg, rgba(0, 210, 255, 0.12), rgba(31, 111, 235, 0.12)); border: 1px solid var(--brand); border-radius: 8px; padding: 12px 16px; margin-top: 12px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 24px;">🔑</span>
+            <div>
+              <div style="font-weight: 700; font-size: 13.5px; color: var(--brand);">Connect Your Live UniFi Network</div>
+              <div style="font-size: 11.5px; color: var(--text-secondary);">Enter your UniFi Dream Machine, Cloud Key, or Controller IP &amp; API Key to access and monitor your internal switches, access points, and clients.</div>
+            </div>
+          </div>
+          <button id="unifi-banner-add-api-btn" class="nw-btn active" style="font-size: 12px; font-weight: 700; padding: 7px 16px; box-shadow: 0 0 14px rgba(0, 210, 255, 0.35); cursor: pointer;">
+            <span>➕ Add UniFi API Key</span>
+          </button>
         </div>
 
         <!-- KPI Metric Strip -->
@@ -299,28 +313,15 @@ export class UnifiTab {
     }
 
     // Modal Opening & Closing
+    const bannerAddBtn = this.container.querySelector('#unifi-banner-add-api-btn');
     const configBtn = this.container.querySelector('#unifi-config-btn');
-    const modal = this.container.querySelector('#unifi-config-modal');
     const closeBtn = this.container.querySelector('#unifi-modal-close');
     const cancelBtn = this.container.querySelector('#cfg-unifi-cancel-btn');
 
-    const openModal = () => {
-      modal.style.display = 'flex';
-      const urlInput = this.container.querySelector('#cfg-unifi-url');
-      if (this.status && this.status.controllerUrl && !this.status.isDemo) {
-        urlInput.value = this.status.controllerUrl;
-      }
-    };
-
-    const closeModal = () => {
-      modal.style.display = 'none';
-      const resultBox = this.container.querySelector('#cfg-unifi-test-result');
-      if (resultBox) resultBox.style.display = 'none';
-    };
-
-    if (configBtn) configBtn.addEventListener('click', openModal);
-    if (closeBtn) closeBtn.addEventListener('click', closeModal);
-    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    if (bannerAddBtn) bannerAddBtn.addEventListener('click', () => this.openConfigModal());
+    if (configBtn) configBtn.addEventListener('click', () => this.openConfigModal());
+    if (closeBtn) closeBtn.addEventListener('click', () => this.closeConfigModal());
+    if (cancelBtn) cancelBtn.addEventListener('click', () => this.closeConfigModal());
 
     // Auth Type Radio Toggle
     const authRadios = this.container.querySelectorAll('input[name="unifi-auth-type"]');
@@ -471,6 +472,26 @@ export class UnifiTab {
     } finally {
       saveBtn.innerHTML = 'Save & Connect';
       saveBtn.disabled = false;
+    }
+  }
+
+  openConfigModal() {
+    const modal = this.container.querySelector('#unifi-config-modal');
+    if (modal) {
+      modal.style.display = 'flex';
+      const urlInput = this.container.querySelector('#cfg-unifi-url');
+      if (urlInput && this.status && this.status.controllerUrl && !this.status.isDemo) {
+        urlInput.value = this.status.controllerUrl;
+      }
+    }
+  }
+
+  closeConfigModal() {
+    const modal = this.container.querySelector('#unifi-config-modal');
+    if (modal) {
+      modal.style.display = 'none';
+      const resultBox = this.container.querySelector('#cfg-unifi-test-result');
+      if (resultBox) resultBox.style.display = 'none';
     }
   }
 

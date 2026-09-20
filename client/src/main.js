@@ -143,6 +143,13 @@ class NetWatchApp {
             <kbd class="nw-kbd">P</kbd>
           </button>
 
+          <!-- UniFi Controller Quick Access -->
+          <button id="unifi-header-btn" class="nw-header-btn nw-unifi-btn" title="Add / Access UniFi Network API [U]" style="border-color: rgba(0, 210, 255, 0.5); color: var(--brand);">
+            <span class="nw-btn-icon">🌐</span>
+            <span class="nw-btn-text">UniFi API</span>
+            <kbd class="nw-kbd">U</kbd>
+          </button>
+
           <!-- Doctor Pre-flight Button -->
           <button id="doctor-btn" class="nw-header-btn nw-doctor-btn" title="Run NetWatch Doctor Capability Check">
             <span class="nw-btn-icon">🩺</span>
@@ -175,8 +182,8 @@ class NetWatchApp {
           <span class="nw-key-badge">0</span> Egress
           <span id="tab-egress-badge" class="nw-badge-count" style="display: none; background: var(--status-warn);">!</span>
         </button>
-        <button class="nw-tab" data-tab="11">
-          <span class="nw-key-badge">U</span> UniFi
+        <button class="nw-tab" data-tab="11" id="tab-unifi" style="color: var(--brand); font-weight: 600;">
+          <span class="nw-key-badge" style="background: rgba(0, 210, 255, 0.2); border-color: var(--brand); color: var(--brand);">U</span> 🌐 UniFi
         </button>
       </nav>
 
@@ -222,6 +229,19 @@ class NetWatchApp {
     document.querySelector('#help-btn').addEventListener('click', () => {
       showHelpModal();
     });
+
+    const unifiBtn = document.querySelector('#unifi-header-btn');
+    if (unifiBtn) {
+      unifiBtn.addEventListener('click', () => {
+        this.switchView('full');
+        this.switchTab(11);
+        setTimeout(() => {
+          if (this.activeTabComponent && typeof this.activeTabComponent.openConfigModal === 'function') {
+            this.activeTabComponent.openConfigModal();
+          }
+        }, 50);
+      });
+    }
 
     document.querySelector('#doctor-btn').addEventListener('click', () => {
       this.openDoctorPreflight();
